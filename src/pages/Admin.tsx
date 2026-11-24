@@ -1,12 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Shield, Users, AlertTriangle, CheckCircle, Clock, History, Search, 
-  ArrowLeft, Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
+  Ban, UserCheck, ClipboardList, Trash2, Eye, Phone, Mail, MapPin, 
   Briefcase, Heart, Star, Send, Coins, Download, MessageSquare, ShieldCheck, ShieldOff,
   MessageCircle, Building2, Flag, Shirt, Film
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { WaitlistAdminDialog } from '@/components/admin/WaitlistAdminDialog';
+import { WaitlistExportButton } from '@/components/admin/WaitlistExportButton';
+import { citiesShareGroup } from '@/lib/cityNormalization';
 import PageLayout from '@/components/layout/PageLayout';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +21,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -31,6 +34,8 @@ import {
   useLowReputationUsers,
   useChangeAccessStatus,
   useDeleteUser,
+  useRestoreUser,
+  useHardDeleteUser,
 } from '@/hooks/useAdmin';
 import {
   useAdminUserData,
@@ -39,17 +44,22 @@ import {
   useAdjustUserCredits,
   useBulkAwardCredits,
   exportUsersToCSV,
-  AdminUserData,
   useToggleAdminRole,
   useSendIndividualMessage,
-  useSendMultiUserMessage,
 } from '@/hooks/useAdminExtended';
 import { formatDistanceToNow } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PartnerApplicationsTab } from '@/components/admin/PartnerApplicationsTab';
+import { AdminMembersTab, type MemberRowActions } from '@/components/admin/members/AdminMembersTab';
+import { useHideMembersLocally } from '@/hooks/useAdminMembers';
+import { memberLabel } from '@/lib/adminMembers';
 import { ContentReportsTab } from '@/components/admin/ContentReportsTab';
+import { ContentModerationTab } from '@/components/admin/ContentModerationTab';
+import { AdminStats } from '@/components/admin/AdminStats';
 import { NuanceInterestTab } from '@/components/admin/NuanceInterestTab';
 import { CinemaReviewTab } from '@/components/admin/CinemaReviewTab';
+import { readNumber } from '@/lib/numberField';
+import { toast } from 'sonner';
 
 type UserAccessStatus = 'active' | 'banned';
 type MessageAudience = 'all' | 'mindset_level' | 'city';
@@ -67,20 +77,16 @@ const Admin: React.FC = () => {
   const { isAdmin, isLoading: checkingAdmin } = useIsAdmin();
   
   // State
-  const [search, setSearch] = useState('');
-  const [mindsetFilter, setMindsetFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   
   // Dialog states
   const [suspendDialog, setSuspendDialog] = useState<{ userId: string; name: string } | null>(null);
   const [statusDialog, setStatusDialog] = useState<{ userId: string; name: string; currentStatus: string } | null>(null);
   const [removeDialog, setRemoveDialog] = useState<{ userId: string; name: string } | null>(null);
-  const [detailDialog, setDetailDialog] = useState<AdminUserData | null>(null);
+  const [hardDeleteDialog, setHardDeleteDialog] = useState<{ userId: string; name: string } | null>(null);
+  const [hardConfirm, setHardConfirm] = useState('');
   const [creditDialog, setCreditDialog] = useState<{ userId: string; name: string; balance: number } | null>(null);
   const [bulkCreditDialog, setBulkCreditDialog] = useState(false);
   const [massMessageDialog, setMassMessageDialog] = useState(false);
-  const [multiUserMessageDialog, setMultiUserMessageDialog] = useState(false);
   const [individualMessageDialog, setIndividualMessageDialog] = useState<{ 
     userId: string; 
     name: string; 
@@ -105,7 +111,9 @@ const Admin: React.FC = () => {
 
   // Queries
   const { data: users, isLoading: loadingUsers } = useAllUsers();
-  const { data: adminUserData, isLoading: loadingAdminData } = useAdminUserData();
+  // The full member dump is only for CSV export and audience-wide credit awards.
+  const { data: adminUserData, refetch: loadAdminUserData, isFetching: loadingAdminData } = useAdminUserData({ enabled: bulkCreditDialog });
+  const hideMembersLocally = useHideMembersLocally();
   const { data: pendingOnboarding, isLoading: loadingPending } = usePendingOnboarding();
   const { data: adminActions, isLoading: loadingActions } = useAdminActions();
   const { data: announcements, isLoading: loadingAnnouncements } = useAdminAnnouncements();
@@ -117,33 +125,14 @@ const Admin: React.FC = () => {
   const approveOnboarding = useApproveOnboarding();
   const changeAccessStatus = useChangeAccessStatus();
   const deleteUser = useDeleteUser();
+  const restoreUser = useRestoreUser();
+  const hardDeleteUser = useHardDeleteUser();
   const adjustCredits = useAdjustUserCredits();
   const bulkAwardCredits = useBulkAwardCredits();
   const sendMassNotification = useSendMassNotification();
   const toggleAdminRole = useToggleAdminRole();
   const sendIndividualMessage = useSendIndividualMessage();
-  const sendMultiUserMessage = useSendMultiUserMessage();
 
-  // Filtered users
-  const filteredUsers = useMemo(() => {
-    if (!adminUserData) return [];
-    
-    return adminUserData.filter(u => {
-      const matchesSearch = 
-        u.display_name?.toLowerCase().includes(search.toLowerCase()) ||
-        u.email?.toLowerCase().includes(search.toLowerCase()) ||
-        u.city?.toLowerCase().includes(search.toLowerCase()) ||
-        u.phone?.toLowerCase().includes(search.toLowerCase());
-      
-      const matchesMindset = mindsetFilter === 'all' || 
-        u.mindset_level?.toString() === mindsetFilter;
-      
-      const matchesStatus = statusFilter === 'all' || 
-        (u.access_status || 'pending') === statusFilter;
-      
-      return matchesSearch && matchesMindset && matchesStatus;
-    });
-  }, [adminUserData, search, mindsetFilter, statusFilter]);
 
   if (checkingAdmin) {
     return (
@@ -182,17 +171,52 @@ const Admin: React.FC = () => {
 
   const handleRemoveUser = () => {
     if (removeDialog) {
-      deleteUser.mutate({ userId: removeDialog.userId, reason: reason || undefined });
+      const { userId, name } = removeDialog;
+      deleteUser.mutate(
+        { userId, reason: reason || undefined },
+        {
+          onSuccess: () => {
+            // The list hides removed people by default, so drop the row now.
+            hideMembersLocally([userId]);
+            toast.success(`Removed ${name}`, {
+              description: 'Hidden from Explore and the member list. Find them under Removed.',
+              duration: 10_000,
+              action: { label: 'Undo', onClick: () => restoreUser.mutate({ userId }) },
+            });
+          },
+        },
+      );
       setRemoveDialog(null);
       setReason('');
     }
   };
 
+  const memberActions: MemberRowActions = {
+    credits: (m) => setCreditDialog({ userId: m.user_id, name: memberLabel(m), balance: m.credit_balance }),
+    status: (m) => setStatusDialog({ userId: m.user_id, name: memberLabel(m), currentStatus: m.access_status || 'pending' }),
+    message: (m) => setIndividualMessageDialog({ userId: m.user_id, name: memberLabel(m), email: m.email, phone: m.phone }),
+    suspend: (m) => {
+      setReason('');
+      setSuspendDialog({ userId: m.user_id, name: memberLabel(m) });
+    },
+    unsuspend: (m) => unsuspendUser.mutate(m.user_id),
+    remove: (m) => {
+      setReason('');
+      setRemoveDialog({ userId: m.user_id, name: memberLabel(m) });
+    },
+    restore: (m) => restoreUser.mutate({ userId: m.user_id }),
+    toggleAdmin: (m) => {
+      const question = m.is_admin ? `Remove admin access from ${memberLabel(m)}?` : `Make ${memberLabel(m)} an admin?`;
+      if (window.confirm(question)) toggleAdminRole.mutate({ userId: m.user_id, makeAdmin: !m.is_admin });
+    },
+  };
+
   const handleAdjustCredits = () => {
-    if (creditDialog && creditAmount && creditReason) {
+    const credits = readNumber(creditAmount, { label: 'Amount', integer: true });
+    if (creditDialog && !credits.error && credits.value && creditReason) {
       adjustCredits.mutate({
         userId: creditDialog.userId,
-        amount: parseInt(creditAmount),
+        amount: credits.value,
         reason: creditReason,
       });
       setCreditDialog(null);
@@ -202,20 +226,26 @@ const Admin: React.FC = () => {
   };
 
   const handleBulkAward = () => {
-    if (creditAmount && creditReason && adminUserData) {
-      // Filter users based on target audience
+    const award = readNumber(creditAmount, { label: 'Amount', min: 1, integer: true });
+    if (award.error || award.value === null) {
+      toast.error(award.error ?? 'Enter amount');
+      return;
+    }
+    if (creditReason && adminUserData) {
+      // Filter users based on target audience. Removed and suspended people are skipped.
+      const eligible = adminUserData.filter(u => !u.deleted_at && !u.is_suspended);
       let targetUserIds: string[] = [];
       if (messageTarget === 'all') {
-        targetUserIds = adminUserData.map(u => u.user_id);
+        targetUserIds = eligible.map(u => u.user_id);
       } else if (messageTarget === 'mindset_level') {
-        targetUserIds = adminUserData.filter(u => u.mindset_level === parseInt(messageTargetValue)).map(u => u.user_id);
+        targetUserIds = eligible.filter(u => u.mindset_level === parseInt(messageTargetValue)).map(u => u.user_id);
       } else if (messageTarget === 'city') {
-        targetUserIds = adminUserData.filter(u => u.city?.toLowerCase() === messageTargetValue.toLowerCase()).map(u => u.user_id);
+        targetUserIds = eligible.filter(u => citiesShareGroup(u.city, messageTargetValue)).map(u => u.user_id);
       }
       
       bulkAwardCredits.mutate({
         userIds: targetUserIds,
-        amount: parseInt(creditAmount),
+        amount: award.value,
         reason: creditReason,
       });
       setBulkCreditDialog(false);
@@ -262,44 +292,6 @@ const Admin: React.FC = () => {
     }
   };
 
-  const handleSendMultiUserMessage = () => {
-    if (selectedUsers.size > 0 && messageTitle && messageBody) {
-      sendMultiUserMessage.mutate({
-        userIds: Array.from(selectedUsers),
-        title: messageTitle,
-        message: messageBody,
-        sendDm: deliveryMethods.dm,
-        sendEmail: deliveryMethods.email,
-        sendSms: deliveryMethods.sms,
-      });
-      setMultiUserMessageDialog(false);
-      setSelectedUsers(new Set());
-      setMessageTitle('');
-      setMessageBody('');
-      setDeliveryMethods({ email: true, sms: false, dm: true });
-    }
-  };
-
-  const toggleUserSelection = (userId: string) => {
-    setSelectedUsers(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(userId)) {
-        newSet.delete(userId);
-      } else {
-        newSet.add(userId);
-      }
-      return newSet;
-    });
-  };
-
-  const selectAllFilteredUsers = () => {
-    setSelectedUsers(new Set(filteredUsers.map(u => u.user_id)));
-  };
-
-  const clearSelection = () => {
-    setSelectedUsers(new Set());
-  };
-
   const getStatusBadge = (status: string | null) => {
     switch (status) {
       case 'active':
@@ -329,9 +321,7 @@ const Admin: React.FC = () => {
         {/* Header */}
         <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton />
             <Shield className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           </div>
@@ -351,33 +341,7 @@ const Admin: React.FC = () => {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="px-4 py-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold">{adminUserData?.length || 0}</div>
-              <div className="text-sm text-muted-foreground">Total Users</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-yellow-500">{pendingOnboarding?.length || 0}</div>
-              <div className="text-sm text-muted-foreground">Pending Review</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-primary">{announcements?.length || 0}</div>
-              <div className="text-sm text-muted-foreground">Announcements</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-orange-500">{lowRepUsers?.length || 0}</div>
-              <div className="text-sm text-muted-foreground">Low Reputation</div>
-            </CardContent>
-          </Card>
-        </div>
+        <AdminStats />
 
         {/* Quick Actions */}
         <div className="px-4 pb-4 flex gap-2 flex-wrap">
@@ -385,28 +349,24 @@ const Admin: React.FC = () => {
             <Send className="h-4 w-4" />
             Mass Message
           </Button>
-          {selectedUsers.size > 0 && (
-            <Button 
-              onClick={() => setMultiUserMessageDialog(true)} 
-              className="gap-2 bg-primary"
-            >
-              <MessageCircle className="h-4 w-4" />
-              Message Selected ({selectedUsers.size})
-            </Button>
-          )}
           <Button variant="outline" onClick={() => setBulkCreditDialog(true)} className="gap-2">
             <Coins className="h-4 w-4" />
             Bulk Award Credits
           </Button>
           <Button 
             variant="outline" 
-            onClick={() => adminUserData && exportUsersToCSV(adminUserData)} 
+            onClick={async () => {
+              const { data } = await loadAdminUserData();
+              if (data) exportUsersToCSV(data);
+            }}
             className="gap-2"
-            disabled={!adminUserData}
+            disabled={loadingAdminData}
           >
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
+          <WaitlistExportButton />
+          <WaitlistAdminDialog />
         </div>
 
         {/* Tabs */}
@@ -418,6 +378,9 @@ const Admin: React.FC = () => {
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="flagged"><AlertTriangle className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="reports" title="Reports"><Flag className="h-4 w-4" /></TabsTrigger>
+            <TabsTrigger value="content" title="Content">
+              <ClipboardList className="h-4 w-4" />
+            </TabsTrigger>
             <TabsTrigger value="history"><History className="h-4 w-4" /></TabsTrigger>
             <TabsTrigger value="cinema" title="Cinema review">
               <Film className="h-4 w-4" />
@@ -430,249 +393,12 @@ const Admin: React.FC = () => {
 
           {/* All Users Tab */}
           <TabsContent value="users" className="mt-4">
-            <div className="space-y-4">
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name, email, city, or phone..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-                <Select value={mindsetFilter} onValueChange={setMindsetFilter}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Mindset" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Levels</SelectItem>
-                    <SelectItem value="1">Level 1</SelectItem>
-                    <SelectItem value="2">Level 2</SelectItem>
-                    <SelectItem value="3">Level 3</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="denied">Denied</SelectItem>
-                    <SelectItem value="banned">Banned</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Selection Controls */}
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">
-                  Showing {filteredUsers.length} of {adminUserData?.length || 0} users
-                  {selectedUsers.size > 0 && (
-                    <span className="ml-2 text-primary font-medium">
-                      ({selectedUsers.size} selected)
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={selectAllFilteredUsers}
-                    disabled={filteredUsers.length === 0}
-                  >
-                    Select All ({filteredUsers.length})
-                  </Button>
-                  {selectedUsers.size > 0 && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={clearSelection}
-                    >
-                      Clear
-                    </Button>
-                  )}
-                </div>
-              </div>
-              
-              <ScrollArea className="h-[500px]">
-                {loadingAdminData ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {filteredUsers.map(user => (
-                      <Card 
-                        key={user.user_id} 
-                        className={`overflow-hidden transition-colors ${selectedUsers.has(user.user_id) ? 'ring-2 ring-primary bg-primary/5' : ''}`}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-start gap-3 flex-1 min-w-0">
-                              <div className="flex flex-col items-center gap-2">
-                                <Checkbox
-                                  checked={selectedUsers.has(user.user_id)}
-                                  onCheckedChange={() => toggleUserSelection(user.user_id)}
-                                  className="mt-1"
-                                />
-                                <Avatar className="h-10 w-10">
-                                  <AvatarFallback>{user.display_name?.[0] || '?'}</AvatarFallback>
-                                </Avatar>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap mb-1">
-                                  <span className="font-semibold">{user.display_name || 'Unnamed'}</span>
-                                  {user.is_admin && (
-                                    <Badge className="bg-amber-500 text-white gap-1">
-                                      <ShieldCheck className="h-3 w-3" />
-                                      Admin
-                                    </Badge>
-                                  )}
-                                  {getStatusBadge(user.access_status)}
-                                  {getMindsetBadge(user.mindset_level)}
-                                  <Badge variant="outline" className="gap-1">
-                                    <Coins className="h-3 w-3" />
-                                    {user.credit_balance}
-                                  </Badge>
-                                </div>
-                                
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-muted-foreground mb-2">
-                                  {user.email && (
-                                    <div className="flex items-center gap-1">
-                                      <Mail className="h-3 w-3" />
-                                      <span className="truncate">{user.email}</span>
-                                    </div>
-                                  )}
-                                  {user.phone && (
-                                    <div className="flex items-center gap-1">
-                                      <Phone className="h-3 w-3" />
-                                      {user.phone}
-                                    </div>
-                                  )}
-                                  {user.city && (
-                                    <div className="flex items-center gap-1">
-                                      <MapPin className="h-3 w-3" />
-                                      {user.city}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Creative Roles */}
-                                {user.creative_roles.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mb-1">
-                                    <Briefcase className="h-3 w-3 text-muted-foreground mt-0.5" />
-                                    {user.creative_roles.map((role, i) => (
-                                      <Badge key={i} className="text-xs bg-primary/20 text-primary">{role}</Badge>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {/* Skills */}
-                                {user.skills.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mb-1">
-                                    <Star className="h-3 w-3 text-muted-foreground mt-0.5" />
-                                    {user.skills.map((skill, i) => (
-                                      <Badge key={i} variant="secondary" className="text-xs">{skill}</Badge>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {/* Passions */}
-                                {user.passions.length > 0 && (
-                                  <div className="flex flex-wrap gap-1">
-                                    <Heart className="h-3 w-3 text-muted-foreground mt-0.5" />
-                                    {user.passions.map((passion, i) => (
-                                      <Badge key={i} variant="outline" className="text-xs">{passion}</Badge>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="flex flex-col gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDetailDialog(user)}
-                              >
-                                <Eye className="h-3 w-3 mr-1" />
-                                View
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setCreditDialog({ 
-                                  userId: user.user_id, 
-                                  name: user.display_name || 'User',
-                                  balance: user.credit_balance
-                                })}
-                              >
-                                <Coins className="h-3 w-3 mr-1" />
-                                Credits
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setStatusDialog({ 
-                                  userId: user.user_id, 
-                                  name: user.display_name || 'User',
-                                  currentStatus: user.access_status || 'pending'
-                                })}
-                              >
-                                Status
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setIndividualMessageDialog({ 
-                                  userId: user.user_id, 
-                                  name: user.display_name || 'User',
-                                  email: user.email,
-                                  phone: user.phone,
-                                })}
-                              >
-                                <MessageCircle className="h-3 w-3 mr-1" />
-                                Message
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={user.is_admin ? "destructive" : "outline"}
-                                onClick={() => toggleAdminRole.mutate({ 
-                                  userId: user.user_id, 
-                                  makeAdmin: !user.is_admin 
-                                })}
-                                disabled={toggleAdminRole.isPending}
-                              >
-                                {user.is_admin ? (
-                                  <>
-                                    <ShieldOff className="h-3 w-3 mr-1" />
-                                    Remove Admin
-                                  </>
-                                ) : (
-                                  <>
-                                    <ShieldCheck className="h-3 w-3 mr-1" />
-                                    Make Admin
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
+            <AdminMembersTab actions={memberActions} />
           </TabsContent>
 
           {/* Pending Onboarding Tab */}
           <TabsContent value="pending" className="mt-4">
-            <ScrollArea className="h-[400px]">
+            <div className="w-full">
               {loadingPending ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map(i => <Skeleton key={i} className="h-24" />)}
@@ -731,7 +457,7 @@ const Admin: React.FC = () => {
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </TabsContent>
 
           {/* Partner Applications Tab */}
@@ -758,7 +484,7 @@ const Admin: React.FC = () => {
                 <CardDescription>Previous mass notifications sent to users</CardDescription>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="h-[350px]">
+                <div className="w-full">
                   {loadingAnnouncements ? (
                     <div className="space-y-3">
                       {[1, 2, 3].map(i => <Skeleton key={i} className="h-20" />)}
@@ -794,14 +520,14 @@ const Admin: React.FC = () => {
                       ))}
                     </div>
                   )}
-                </ScrollArea>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Flagged Users Tab */}
           <TabsContent value="flagged" className="mt-4">
-            <ScrollArea className="h-[400px]">
+            <div className="w-full">
               {lowRepUsers?.length === 0 ? (
                 <div className="text-center py-12">
                   <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
@@ -830,16 +556,20 @@ const Admin: React.FC = () => {
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </TabsContent>
 
           <TabsContent value="reports" className="mt-4">
             <ContentReportsTab />
           </TabsContent>
 
+          <TabsContent value="content" className="mt-4">
+            <ContentModerationTab />
+          </TabsContent>
+
           {/* Action History Tab */}
           <TabsContent value="history" className="mt-4">
-            <ScrollArea className="h-[400px]">
+            <div className="w-full">
               {loadingActions ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}
@@ -875,7 +605,7 @@ const Admin: React.FC = () => {
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </TabsContent>
 
           <TabsContent value="nuance" className="mt-4">
@@ -906,8 +636,85 @@ const Admin: React.FC = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSuspendDialog(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleSuspend} disabled={!reason}>
+            <Button variant="destructive" onClick={handleSuspend} disabled={!reason || suspendUser.isPending}>
               Suspend User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!removeDialog} onOpenChange={() => setRemoveDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove {removeDialog?.name}</DialogTitle>
+            <DialogDescription>
+              This hides the account and signs them out. The row stays so it can be restored.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Reason</Label>
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Why is this account being removed?"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveDialog(null)}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!removeDialog) return;
+                setHardConfirm('');
+                setHardDeleteDialog(removeDialog);
+                setRemoveDialog(null);
+              }}
+            >
+              Delete permanently…
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveUser} disabled={deleteUser.isPending}>
+              Remove account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!hardDeleteDialog} onOpenChange={() => setHardDeleteDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Permanently delete {hardDeleteDialog?.name}?</DialogTitle>
+            <DialogDescription>
+              This deletes the login and personal data. It cannot be undone. Paste the user id to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>User id</Label>
+            <Input
+              value={hardConfirm}
+              onChange={(e) => setHardConfirm(e.target.value.trim())}
+              placeholder={hardDeleteDialog?.userId}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHardDeleteDialog(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={!hardDeleteDialog || hardConfirm !== hardDeleteDialog.userId || hardDeleteUser.isPending}
+              onClick={() => {
+                if (!hardDeleteDialog) return;
+                hardDeleteUser.mutate({
+                  userId: hardDeleteDialog.userId,
+                  confirm: hardConfirm,
+                  reason: reason || undefined,
+                });
+                setHardDeleteDialog(null);
+                setHardConfirm('');
+                setReason('');
+              }}
+            >
+              Delete permanently
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -963,9 +770,11 @@ const Admin: React.FC = () => {
             <div>
               <Label>Amount (positive to add, negative to deduct)</Label>
               <Input
-                type="number"
+                type="text"
+                inputMode="text"
+                pattern="-?[0-9]*"
                 value={creditAmount}
-                onChange={(e) => setCreditAmount(e.target.value)}
+                onChange={(e) => setCreditAmount(e.target.value.replace(/[^0-9-]/g, '').replace(/(?!^)-/g, ''))}
                 placeholder="e.g., 100 or -50"
               />
             </div>
@@ -1044,6 +853,7 @@ const Admin: React.FC = () => {
                 onChange={(e) => setCreditAmount(e.target.value)}
                 placeholder="Credits to award"
                 min="1"
+                step="1"
               />
             </div>
             <div>
@@ -1143,130 +953,6 @@ const Admin: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* User Detail Dialog */}
-      <Dialog open={!!detailDialog} onOpenChange={() => setDetailDialog(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>User Details</DialogTitle>
-          </DialogHeader>
-          {detailDialog && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-16 w-16">
-                  <AvatarFallback className="text-xl">{detailDialog.display_name?.[0] || '?'}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="font-semibold text-lg">{detailDialog.display_name || 'Unnamed'}</h3>
-                  <div className="flex gap-2 mt-1">
-                    {getStatusBadge(detailDialog.access_status)}
-                    {getMindsetBadge(detailDialog.mindset_level)}
-                    <Badge variant="outline" className="gap-1">
-                      <Coins className="h-3 w-3" />
-                      {detailDialog.credit_balance} credits
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid gap-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{detailDialog.email || 'No email'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{detailDialog.city || 'No location'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{detailDialog.phone || 'No phone'}</span>
-                </div>
-              </div>
-
-              {detailDialog.creative_roles?.length > 0 && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Creative Roles</Label>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {detailDialog.creative_roles.map((role: string, i: number) => (
-                      <Badge key={i} variant="outline">{role}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {detailDialog.skills?.length > 0 && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Skills</Label>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {detailDialog.skills.map((skill: string, i: number) => (
-                      <Badge key={i} variant="secondary">{skill}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {detailDialog.passions?.length > 0 && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Passions</Label>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {detailDialog.passions.map((passion: string, i: number) => (
-                      <Badge key={i} variant="outline" className="border-destructive/30">{passion}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {detailDialog.social_links && Object.values(detailDialog.social_links).some(v => v) && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Social Links</Label>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {detailDialog.social_links.instagram && (
-                      <Badge variant="outline" className="gap-1">
-                        <span className="text-pink-500">IG</span>
-                        {detailDialog.social_links.instagram}
-                      </Badge>
-                    )}
-                    {detailDialog.social_links.twitter && (
-                      <Badge variant="outline" className="gap-1">
-                        <span className="text-blue-400">X</span>
-                        {detailDialog.social_links.twitter}
-                      </Badge>
-                    )}
-                    {detailDialog.social_links.tiktok && (
-                      <Badge variant="outline" className="gap-1">
-                        <span>TikTok</span>
-                        {detailDialog.social_links.tiktok}
-                      </Badge>
-                    )}
-                    {detailDialog.social_links.youtube && (
-                      <Badge variant="outline" className="gap-1">
-                        <span className="text-red-500">YT</span>
-                        {detailDialog.social_links.youtube}
-                      </Badge>
-                    )}
-                    {detailDialog.social_links.linkedin && (
-                      <Badge variant="outline" className="gap-1">
-                        <span className="text-blue-600">LI</span>
-                        {detailDialog.social_links.linkedin}
-                      </Badge>
-                    )}
-                    {detailDialog.social_links.website && (
-                      <Badge variant="outline" className="gap-1">
-                        <span>🌐</span>
-                        {detailDialog.social_links.website}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailDialog(null)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Individual Message Dialog */}
       <Dialog open={!!individualMessageDialog} onOpenChange={() => setIndividualMessageDialog(null)}>
         <DialogContent className="sm:max-w-lg">
@@ -1358,115 +1044,6 @@ const Admin: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Multi-User Message Dialog */}
-      <Dialog open={multiUserMessageDialog} onOpenChange={setMultiUserMessageDialog}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Send Message to {selectedUsers.size} Users</DialogTitle>
-            <DialogDescription>
-              Choose how to deliver this message to selected users
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Selected Users Preview */}
-            <div className="bg-muted/50 rounded-lg p-3">
-              <Label className="text-xs text-muted-foreground mb-2 block">Selected Recipients</Label>
-              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-                {Array.from(selectedUsers).slice(0, 10).map(userId => {
-                  const user = adminUserData?.find(u => u.user_id === userId);
-                  return (
-                    <Badge key={userId} variant="secondary" className="text-xs">
-                      {user?.display_name || 'User'}
-                    </Badge>
-                  );
-                })}
-                {selectedUsers.size > 10 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{selectedUsers.size - 10} more
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <Label>Delivery Methods</Label>
-              <div className="flex flex-wrap gap-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="multi-dm-check"
-                    checked={deliveryMethods.dm}
-                    onCheckedChange={(checked) => 
-                      setDeliveryMethods(prev => ({ ...prev, dm: !!checked }))
-                    }
-                  />
-                  <label htmlFor="multi-dm-check" className="text-sm font-medium flex items-center gap-1">
-                    <MessageCircle className="h-4 w-4" />
-                    In-App Notification
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="multi-email-check"
-                    checked={deliveryMethods.email}
-                    onCheckedChange={(checked) => 
-                      setDeliveryMethods(prev => ({ ...prev, email: !!checked }))
-                    }
-                  />
-                  <label htmlFor="multi-email-check" className="text-sm font-medium flex items-center gap-1">
-                    <Mail className="h-4 w-4" />
-                    Email
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="multi-sms-check"
-                    checked={deliveryMethods.sms}
-                    onCheckedChange={(checked) => 
-                      setDeliveryMethods(prev => ({ ...prev, sms: !!checked }))
-                    }
-                  />
-                  <label htmlFor="multi-sms-check" className="text-sm font-medium flex items-center gap-1">
-                    <Phone className="h-4 w-4" />
-                    SMS
-                  </label>
-                </div>
-              </div>
-            </div>
-            <div>
-              <Label>Title</Label>
-              <Input
-                value={messageTitle}
-                onChange={(e) => setMessageTitle(e.target.value)}
-                placeholder="Message title"
-              />
-            </div>
-            <div>
-              <Label>Message</Label>
-              <Textarea
-                value={messageBody}
-                onChange={(e) => setMessageBody(e.target.value)}
-                placeholder="Write your message..."
-                rows={4}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMultiUserMessageDialog(false)}>Cancel</Button>
-            <Button 
-              onClick={handleSendMultiUserMessage} 
-              disabled={
-                !messageTitle || 
-                !messageBody || 
-                selectedUsers.size === 0 ||
-                (!deliveryMethods.email && !deliveryMethods.sms && !deliveryMethods.dm) ||
-                sendMultiUserMessage.isPending
-              }
-            >
-              {sendMultiUserMessage.isPending ? 'Sending...' : `Send to ${selectedUsers.size} Users`}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </PageLayout>
   );
 };

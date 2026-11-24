@@ -22,6 +22,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { usePortfolioFolders, PortfolioFolder, CreateFolderInput } from '@/hooks/usePortfolioFolders';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errorMessage';
 import { cn } from '@/lib/utils';
 
 interface ProfileFoldersProps {
@@ -61,7 +62,7 @@ export function ProfileFolders({ userId, isOwner, onFolderClick }: ProfileFolder
       toast.success('Cover image uploaded!');
     } catch (error) {
       console.error('Error uploading cover:', error);
-      toast.error('Failed to upload cover');
+      toast.error(errorMessage(error, 'Failed to upload cover'));
     } finally {
       setIsUploadingCover(false);
     }
@@ -186,7 +187,7 @@ export function ProfileFolders({ userId, isOwner, onFolderClick }: ProfileFolder
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="absolute top-2 right-2 w-7 h-7 bg-background/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-2 right-2 h-11 w-11 bg-background/80 backdrop-blur-sm"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreHorizontal className="w-4 h-4" />

@@ -181,7 +181,7 @@ const BookingSettings = () => {
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
           <h2 className="font-display text-2xl text-foreground">Sign in to manage booking pages</h2>
           <Button asChild>
-            <Link to="/auth">Sign In</Link>
+            <Link to="/auth">Sign in</Link>
           </Button>
         </div>
       </PageLayout>
@@ -194,8 +194,8 @@ const BookingSettings = () => {
         <PageHeader
           title="Booking Pages"
           description="Let others book time with you"
-          icon={<Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
-          backPath="/settings"
+          icon={<Calendar className="w-5 h-5" />}
+          tile="cyan"
           actions={
             !isCreating && (
               <Button onClick={() => setIsCreating(true)}>
@@ -372,6 +372,7 @@ const BookingSettings = () => {
                     Cancel
                   </Button>
                   <Button 
+                    type="button"
                     onClick={handleSave}
                     disabled={createBookingPage.isPending || updateBookingPage.isPending}
                   >
@@ -454,14 +455,14 @@ const BookingSettings = () => {
             ))}
           </div>
         ) : (
-          <Card className="p-12 glass-strong border-border/30 text-center">
+          <Card className="p-6 sm:p-12 glass-strong border-border/30 text-center">
             <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-medium mb-2">No Booking Pages Yet</h3>
             <p className="text-muted-foreground mb-6">
               Create a booking page to let others schedule time with you.
             </p>
-            <Button onClick={() => setIsCreating(true)}>
-              <Plus className="w-4 h-4 mr-2" />
+            <Button className="h-auto min-h-11 max-w-full whitespace-normal" onClick={() => setIsCreating(true)}>
+              <Plus className="w-4 h-4 mr-2 shrink-0" />
               Create Your First Booking Page
             </Button>
           </Card>

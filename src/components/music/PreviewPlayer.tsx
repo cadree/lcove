@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { onSharedPlay, pausePlayer } from "@/lib/musicPlayer";
 import { Play, Pause, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +9,8 @@ interface PreviewPlayerProps {
   durationSeconds?: number;
   locked?: boolean;
   className?: string;
+  /** Lets a cover react to playback (the unlocked record spins). */
+  onPlayingChange?: (playing: boolean) => void;
 }
 
 /**
@@ -21,9 +24,15 @@ export const PreviewPlayer = ({
   durationSeconds = 15,
   locked = true,
   className,
+  onPlayingChange,
 }: PreviewPlayerProps) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const playingChangeRef = useRef(onPlayingChange);
+  playingChangeRef.current = onPlayingChange;
+  useEffect(() => {
+    playingChangeRef.current?.(isPlaying);
+  }, [isPlaying]);
   const [progress, setProgress] = useState(0); // 0 - 1 within preview window
 
   useEffect(() => {
@@ -32,6 +41,15 @@ export const PreviewPlayer = ({
       audioRef.current = null;
     };
   }, [audioUrl]);
+  // One sound at a time: the shared player starting pauses this preview.
+  useEffect(
+    () =>
+      onSharedPlay(() => {
+        audioRef.current?.pause();
+        setIsPlaying(false);
+      }),
+    [],
+  );
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -47,43 +65,46 @@ export const PreviewPlayer = ({
     if (!audioRef.current) {
       const audio = new Audio(audioUrl);
       audio.preload = "metadata";
+      audio.addEventListener("loadedmetadata", () => {
+        try {
+          audio.currentTime = locked ? startSeconds : 0;
+        } catch {
+          // ignore seek errors
+        }
+      });
+      audio.addEventListener("timeupdate", () => {
+        if (!locked) {
+          setProgress(audio.duration ? audio.currentTime / audio.duration : 0);
+          return;
+        }
+        const elapsed = audio.currentTime - startSeconds;
+        setProgress(Math.min(1, Math.max(0, elapsed / durationSeconds)));
+        if (elapsed >= durationSeconds) {
+          audio.pause();
+          try {
+            audio.currentTime = startSeconds;
+          } catch {
+            // ignore seek errors
+          }
+          setIsPlaying(false);
+          setProgress(0);
+        }
+      });
+      audio.addEventListener("ended", () => {
+        setIsPlaying(false);
+        setProgress(0);
+      });
       audioRef.current = audio;
     }
     const audio = audioRef.current;
-
-    const onLoaded = () => {
+    if (audio.readyState >= 1) {
       try {
-        audio.currentTime = locked ? startSeconds : 0;
+        audio.currentTime = locked ? startSeconds : audio.currentTime;
       } catch {
         // ignore seek errors
       }
-    };
-
-    const onTime = () => {
-      if (!locked) {
-        setProgress(audio.duration ? audio.currentTime / audio.duration : 0);
-        return;
-      }
-      const elapsed = audio.currentTime - startSeconds;
-      setProgress(Math.min(1, Math.max(0, elapsed / durationSeconds)));
-      if (elapsed >= durationSeconds) {
-        audio.pause();
-        audio.currentTime = startSeconds;
-        setIsPlaying(false);
-        setProgress(0);
-      }
-    };
-
-    const onEnded = () => {
-      setIsPlaying(false);
-      setProgress(0);
-    };
-
-    audio.addEventListener("loadedmetadata", onLoaded, { once: true });
-    audio.addEventListener("timeupdate", onTime);
-    audio.addEventListener("ended", onEnded);
-
-    if (audio.readyState >= 1) onLoaded();
+    }
+    pausePlayer();
     audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
   };
 
@@ -95,7 +116,7 @@ export const PreviewPlayer = ({
       <button
         type="button"
         onClick={handleToggle}
-        className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0 hover:scale-105 transition-transform"
+        className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0 hover:scale-105 transition-transform"
         aria-label={isPlaying ? "Pause preview" : "Play preview"}
       >
         {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}

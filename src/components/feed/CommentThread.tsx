@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 import { Trash2, Reply, ChevronDown, ChevronUp, Flag } from 'lucide-react';
@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReportDialog } from '@/components/safety/ReportDialog';
+import { InlineError } from '@/components/ui/inline-error';
+import { writeError } from '@/lib/writeError';
 
 interface Comment {
   id: string;
@@ -24,7 +26,7 @@ interface Comment {
 
 interface CommentThreadProps {
   comments: Comment[];
-  onAddComment: (content: string, parentId?: string) => void;
+  onAddComment: (content: string, parentId?: string) => Promise<void>;
   onDeleteComment: (commentId: string) => void;
   isCommenting: boolean;
 }
@@ -43,6 +45,7 @@ const CommentItem = ({
   const { user } = useAuth();
   const [showReplies, setShowReplies] = useState(depth === 0);
   const [reportOpen, setReportOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const isOwner = user?.id === comment.user_id;
   const hasReplies = comment.replies && comment.replies.length > 0;
 
@@ -110,14 +113,40 @@ const CommentItem = ({
             )}
 
             {isOwner && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete(comment.id)}
-                className="text-muted-foreground hover:text-destructive h-auto py-1 px-2 text-xs"
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
+              confirmingDelete ? (
+                <span className="inline-flex items-center gap-2 text-xs">
+                  <span className="text-muted-foreground">Delete this comment?</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      onDelete(comment.id);
+                      setConfirmingDelete(false);
+                    }}
+                    className="h-auto px-2 py-1 text-xs text-destructive"
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmingDelete(false)}
+                    className="h-auto px-2 py-1 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                </span>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmingDelete(true)}
+                  aria-label="Delete comment"
+                  className="text-muted-foreground hover:text-destructive h-auto py-1 px-2 text-xs"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              )
             )}
 
             {user && !isOwner && (
@@ -174,12 +203,22 @@ const CommentThread = ({
   const { user } = useAuth();
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const errorId = useId();
 
-  const handleSubmit = () => {
-    if (!newComment.trim()) return;
-    onAddComment(newComment.trim(), replyingTo || undefined);
+  const handleSubmit = async () => {
+    const text = newComment.trim();
+    if (!text || isCommenting) return;
+    setError(null);
+    try {
+      await onAddComment(text, replyingTo || undefined);
+    } catch (err) {
+      setError(writeError(err, 'Failed to add comment'));
+      return;
+    }
     setNewComment('');
     setReplyingTo(null);
+    setError(null);
   };
 
   const handleReply = (parentId: string) => {
@@ -217,7 +256,12 @@ const CommentThread = ({
             <Textarea
               placeholder={replyingTo ? 'Write a reply...' : 'Add a comment...'}
               value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
+              onChange={(e) => {
+                setNewComment(e.target.value);
+                setError(null);
+              }}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
               className="min-h-[60px] resize-none bg-muted/30 border-border/50 text-sm"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -226,6 +270,7 @@ const CommentThread = ({
               }}
             />
           </div>
+          <InlineError id={errorId} message={error} />
           
           <div className="flex justify-end">
             <Button

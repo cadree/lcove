@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { callRpc } from "@/lib/rpc";
 
 // Types for pipeline data
 export interface PipelineStage {
@@ -307,16 +308,12 @@ export async function movePipelineItem(
  * Deletes a pipeline item.
  */
 export async function deletePipelineItem(item_id: string): Promise<void> {
-  const userId = await getAuthUserId();
-  
-  const { error } = await supabase
-    .from('pipeline_items')
-    .delete()
-    .eq('id', item_id)
-    .eq('owner_user_id', userId);
-  
-  if (error) {
-    throw new Error(`Failed to delete item: ${error.message}`);
+  await getAuthUserId();
+  try {
+    await callRpc("delete_pipeline_contact", { p_item_id: item_id });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete item";
+    throw new Error(message);
   }
 }
 

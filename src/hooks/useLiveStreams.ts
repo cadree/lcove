@@ -4,7 +4,70 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useRef } from 'react';
 import { callRpc } from '@/lib/rpc';
+import { watchRows } from '@/lib/liveRoomWatch';
+import { fromUntyped } from '@/lib/safetyTables';
 import { notifyLiveStream } from '@/lib/notifications';
+import { SHOT_USER_ID, shotHostPreview, shotPeople, shotSessionEnabled, shotViewerPreview } from '@/lib/shotSession';
+import { useUserBlocks } from '@/hooks/useUserBlocks';
+import { assertCleanText } from '@/lib/objectionableText';
+import { giftNoticeLabel } from '@/lib/giftNotice';
+import { mediaObjectPath } from '@/lib/replayStorage';
+
+export const SHOT_STREAM_ID = "0412aaaa-0000-4000-8000-0000000000c1";
+
+function shotLiveStream(): LiveStream {
+  return {
+    id: SHOT_STREAM_ID,
+    host_id: shotPeople[1].user_id,
+    title: "Open Studio",
+    description: "Live from the floor",
+    stream_type: "youtube",
+    external_url: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    thumbnail_url: null,
+    thumbnail_focal_point: null,
+    is_live: true,
+    started_at: "2026-10-19T15:00:00.000Z",
+    ended_at: null,
+    viewer_count: 12,
+    total_tips: 0,
+    created_at: "2026-10-19T15:00:00.000Z",
+    replay_available: false,
+    replay_url: null,
+    rtmp_stream_key: null,
+    rtmp_ingest_url: null,
+    playback_url: null,
+    mux_live_stream_id: null,
+    mux_playback_id: null,
+  };
+}
+
+function shotStreamFixture(): LiveStream {
+  const base = shotLiveStream();
+  if (shotHostPreview()) {
+    return {
+      ...base,
+      host_id: SHOT_USER_ID,
+      title: "Go Live",
+      description: "A long description that should stay inside the dialog on a phone.",
+      thumbnail_url: "/nuance/dynasty-denim.png",
+      stream_type: "webrtc",
+      external_url: null,
+      is_live: false,
+      started_at: null,
+      viewer_count: 0,
+    };
+  }
+  if (shotViewerPreview()) {
+    return {
+      ...base,
+      title: "Live room",
+      stream_type: "webrtc",
+      external_url: null,
+      is_live: true,
+    };
+  }
+  return base;
+}
 
 export interface LiveStream {
   id: string;
@@ -45,10 +108,12 @@ export interface StreamReaction {
 
 export const useLiveStreams = (liveOnly = false) => {
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   const { data: streams = [], isLoading } = useQuery({
     queryKey: ['live-streams', liveOnly],
     queryFn: async () => {
+      if (shotSessionEnabled()) return [shotStreamFixture()];
       let query = supabase
         .from('live_streams_public')
         .select('*')
@@ -68,34 +133,33 @@ export const useLiveStreams = (liveOnly = false) => {
     },
   });
 
-  // Subscribe to realtime updates for live streams
+  // Refresh the list when a row changes. Poll until the socket is joined so a
+  // dropped connection still updates the Live and Replays counts.
   useEffect(() => {
-    const channel = supabase
-      .channel('live-streams-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'live_streams' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['live-streams'] });
-        }
-      )
-      .subscribe();
+    return watchRows(
+      `live-streams-${liveOnly ? "live" : "all"}`,
+      "live_streams",
+      "",
+      queryClient,
+      ["live-streams"],
+      "*",
+    );
+  }, [liveOnly, queryClient]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
+  const visibleStreams = streams.filter((stream) => !blockedIds.includes(stream.host_id));
 
-  return { streams, isLoading };
+  return { streams: visibleStreams, isLoading };
 };
 
 export const useStream = (streamId: string | undefined) => {
   const queryClient = useQueryClient();
+  const { blockedIds } = useUserBlocks();
 
   const { data: stream, isLoading } = useQuery({
     queryKey: ['stream', streamId],
     queryFn: async () => {
       if (!streamId) return null;
+      if (shotSessionEnabled()) return shotStreamFixture();
       const { data, error } = await supabase
         .from('live_streams_public')
         .select('*')
@@ -109,29 +173,27 @@ export const useStream = (streamId: string | undefined) => {
       } as LiveStream;
     },
     enabled: !!streamId,
+    // The host badge reads this row. Keep polling while the sheet is open,
+    // including when the tab is in the background.
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
   });
 
-  // Realtime subscription
   useEffect(() => {
     if (!streamId) return;
-
-    const channel = supabase
-      .channel(`stream-${streamId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'live_streams', filter: `id=eq.${streamId}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['stream', streamId] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return watchRows(
+      `stream-${streamId}`,
+      "live_streams",
+      `id=eq.${streamId}`,
+      queryClient,
+      ["stream", streamId],
+      "*",
+    );
   }, [streamId, queryClient]);
 
-  return { stream, isLoading };
+  const visibleStream = stream && blockedIds.includes(stream.host_id) ? null : stream;
+
+  return { stream: visibleStream, isLoading };
 };
 
 export const useStreamReactions = (streamId: string | undefined) => {
@@ -153,27 +215,98 @@ export const useStreamReactions = (streamId: string | undefined) => {
     enabled: !!streamId,
   });
 
-  // Realtime reactions
   useEffect(() => {
     if (!streamId) return;
-
-    const channel = supabase
-      .channel(`stream-reactions-${streamId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'stream_reactions', filter: `stream_id=eq.${streamId}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['stream-reactions', streamId] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return watchRows(
+      `stream-reactions-${streamId}`,
+      "stream_reactions",
+      `stream_id=eq.${streamId}`,
+      queryClient,
+      ["stream-reactions", streamId],
+    );
   }, [streamId, queryClient]);
 
   return { reactions };
+};
+
+export interface StreamCheer {
+  id: string;
+  label: string;
+  created_at: string;
+}
+
+export const useStreamCheers = (streamId: string | undefined) => {
+  const queryClient = useQueryClient();
+  const { reactions } = useStreamReactions(streamId);
+
+  const { data: tips = [] } = useQuery({
+    queryKey: ["stream-tips", streamId],
+    enabled: !!streamId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("stream_tips")
+        .select("id, amount, message, created_at")
+        .eq("stream_id", streamId!)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) return [];
+      return data;
+    },
+  });
+
+  const { data: gifts = [] } = useQuery({
+    queryKey: ["stream-gifts", streamId],
+    enabled: !!streamId,
+    queryFn: async () => {
+      const { data, error } = await fromUntyped("stream_gift_notices")
+        .select("id, gift, created_at, sender_name")
+        .eq("stream_id", streamId!)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) return [];
+      return (data || []) as { id: string; gift: string; created_at: string; sender_name: string | null }[];
+    },
+  });
+
+  useEffect(() => {
+    if (!streamId) return;
+    const stopTips = watchRows(
+      `stream-tips-${streamId}`,
+      "stream_tips",
+      `stream_id=eq.${streamId}`,
+      queryClient,
+      ["stream-tips", streamId],
+    );
+    // The notice view is not a realtime table. stream_gifts changes are
+    // filtered by sender-or-host RLS, so other viewers never get that event.
+    const refreshGifts = window.setInterval(() => {
+      void queryClient.invalidateQueries({ queryKey: ["stream-gifts", streamId] });
+    }, 1000);
+    return () => {
+      stopTips();
+      window.clearInterval(refreshGifts);
+    };
+  }, [streamId, queryClient]);
+
+  const cheers: StreamCheer[] = [
+    ...reactions.map((reaction) => ({
+      id: reaction.id,
+      label: reaction.emoji,
+      created_at: reaction.created_at,
+    })),
+    ...tips.map((tip) => ({
+      id: tip.id,
+      label: tip.message ? `${tip.amount} LC · ${tip.message}` : `${tip.amount} LC`,
+      created_at: tip.created_at,
+    })),
+    ...gifts.map((gift) => ({
+      id: gift.id,
+      label: giftNoticeLabel(gift.sender_name, gift.gift),
+      created_at: gift.created_at,
+    })),
+  ].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 8);
+
+  return { reactions, cheers };
 };
 
 export const useCreateStream = () => {
@@ -185,17 +318,13 @@ export const useCreateStream = () => {
     mutationFn: async (data: {
       title: string;
       description?: string;
-      stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud' | 'obs_rtmp';
+      stream_type: 'webrtc' | 'youtube' | 'twitch' | 'soundcloud';
       external_url?: string;
       thumbnail_url?: string;
-      // OBS/RTMP fields
-      mux_live_stream_id?: string;
-      mux_playback_id?: string;
-      rtmp_ingest_url?: string;
-      rtmp_stream_key?: string;
-      playback_url?: string;
     }) => {
       if (!user) throw new Error('Not authenticated');
+      assertCleanText(data.title);
+      assertCleanText(data.description);
 
       const { data: stream, error } = await supabase
         .from('live_streams')
@@ -206,12 +335,6 @@ export const useCreateStream = () => {
           stream_type: data.stream_type,
           external_url: data.external_url,
           thumbnail_url: data.thumbnail_url,
-          // OBS/RTMP fields
-          mux_live_stream_id: data.mux_live_stream_id,
-          mux_playback_id: data.mux_playback_id,
-          rtmp_ingest_url: data.rtmp_ingest_url,
-          rtmp_stream_key: data.rtmp_stream_key,
-          playback_url: data.playback_url,
         })
         .select()
         .single();
@@ -277,6 +400,7 @@ export const useGoLive = () => {
 
 export const useSendReaction = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ streamId, emoji }: { streamId: string; emoji: string }) => {
@@ -292,11 +416,15 @@ export const useSendReaction = () => {
 
       if (error) throw error;
     },
+    onSuccess: (_, { streamId }) => {
+      queryClient.invalidateQueries({ queryKey: ["stream-reactions", streamId] });
+    },
   });
 };
 
 export const useTipStream = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const idempotencyKey = useRef<string | null>(null);
 
   return useMutation({
@@ -327,8 +455,9 @@ export const useTipStream = () => {
       if (data.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: (_, { amount }) => {
+    onSuccess: (_, { streamId, amount }) => {
       idempotencyKey.current = null;
+      queryClient.invalidateQueries({ queryKey: ["stream-tips", streamId] });
       toast({ title: `Tipped ${amount} LC!` });
     },
     onError: (error) => {
@@ -344,13 +473,6 @@ export const useEndStream = () => {
   return useMutation({
     mutationFn: async (stream: { id: string; stream_type: string }) => {
       await callRpc('end_live_stream', { p_stream_id: stream.id });
-
-      if (stream.stream_type === 'obs_rtmp') {
-        const { error } = await supabase.functions.invoke('mux-stream', {
-          body: { action: 'disable', streamId: stream.id },
-        });
-        if (error) throw error;
-      }
 
       const channel = supabase.channel(`stream-end-${stream.id}`);
       await Promise.race([
@@ -441,32 +563,33 @@ export const useDeleteStream = () => {
       // First verify user owns this stream
       const { data: stream, error: fetchError } = await supabase
         .from('live_streams')
-        .select('host_id')
+        .select('host_id, replay_url')
         .eq('id', streamId)
         .single();
 
       if (fetchError) throw fetchError;
       if (stream.host_id !== user.id) throw new Error('You can only delete your own streams');
 
-      // Delete stream reactions first
-      await supabase
-        .from('stream_reactions')
-        .delete()
-        .eq('stream_id', streamId);
+      try {
+        await callRpc('delete_own_live_stream', { p_stream_id: streamId });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        const missing = /delete_own_live_stream|schema cache|does not exist|PGRST202/i.test(message);
+        if (!missing) throw error;
+        const { error: deleteError } = await supabase
+          .from('live_streams')
+          .delete()
+          .eq('id', streamId)
+          .eq('host_id', user.id);
+        if (deleteError) throw deleteError;
+      }
 
-      // Delete stream viewers
-      await supabase
-        .from('stream_viewers')
-        .delete()
-        .eq('stream_id', streamId);
-
-      // Delete the stream
-      const { error } = await supabase
-        .from('live_streams')
-        .delete()
-        .eq('id', streamId);
-
-      if (error) throw error;
+      if (stream.replay_url) {
+        const path = mediaObjectPath(stream.replay_url);
+        if (!path) throw new Error('Could not remove the replay file');
+        const { error: storageError } = await supabase.storage.from('media').remove([path]);
+        if (storageError) throw storageError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['live-streams'] });
@@ -474,41 +597,6 @@ export const useDeleteStream = () => {
     },
     onError: (error) => {
       toast({ title: 'Failed to delete stream', description: error.message, variant: 'destructive' });
-    },
-  });
-};
-
-export const useEndOBSStream = () => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (streamId: string) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mux-stream`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action: 'disable', streamId }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to end stream');
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['live-streams'] });
-      toast({ title: 'Stream ended' });
-    },
-    onError: (error) => {
-      toast({ title: 'Failed to end stream', description: error.message, variant: 'destructive' });
     },
   });
 };

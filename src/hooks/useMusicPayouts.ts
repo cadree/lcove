@@ -2,6 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { Capacitor } from "@capacitor/core";
+import { openInSafari } from "@/lib/externalCheckout";
+import { readFunctionError } from "@/lib/functionError";
 import { errorMessage } from "@/lib/errorMessage";
 
 export interface MusicPayoutStatus {
@@ -58,12 +61,24 @@ export const useCreateMusicPayoutAccount = () => {
   return useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("create-music-payout-account");
-      if (error) throw error;
+      if (error) throw new Error(await readFunctionError(error, data, "Could not start payout setup. Try again."));
       if (!data?.url) throw new Error("No onboarding URL returned");
       return data as { url: string; accountId: string };
     },
-    onSuccess: (data) => {
-      window.location.href = data.url;
+    onSuccess: async (data) => {
+      try {
+        const url = new URL(data.url);
+        if (url.protocol !== "https:" || url.hostname !== "connect.stripe.com") throw new Error("Invalid payout setup link");
+        if (Capacitor.getPlatform() === "ios") {
+          // Existing iOS builds allow our website through the Safari bridge.
+          // The landing page redirects to Stripe without logging the one-use link.
+          await openInSafari(`https://etherbylcove.com/payout-onboarding.html#${encodeURIComponent(url.href)}`);
+        } else {
+          window.location.assign(url.href);
+        }
+      } catch (error) {
+        toast.error(errorMessage(error, "Could not open payout setup. Try again."));
+      }
     },
     onError: (err: unknown) => {
       console.error("[MusicPayouts] onboarding error", err);

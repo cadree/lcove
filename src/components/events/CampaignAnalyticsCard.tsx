@@ -3,13 +3,7 @@ import { BarChart3 } from "lucide-react";
 import { useCampaignAnalytics } from "@/hooks/useNotificationCampaigns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-
-interface CampaignTotals {
-  sent?: number;
-  opened?: number;
-  clicked?: number;
-  failed?: number;
-}
+import { campaignPerformance, recentCampaignLabel, type CampaignTotals } from "@/lib/eventGuests";
 
 interface RecentCampaign {
   id: string;
@@ -31,11 +25,12 @@ export function CampaignAnalyticsCard({ eventId }: { eventId?: string }) {
   if (isLoading) return <Skeleton className="h-40 w-full" />;
 
   const analytics = (data ?? null) as unknown as CampaignAnalyticsPayload | null;
-  const totals = analytics?.totals || {};
+  const rawTotals = (analytics?.totals || {}) as CampaignTotals & { by_channel?: Record<string, number> };
+  const totals = campaignPerformance({
+    ...rawTotals,
+    by_channel: rawTotals.by_channel || (analytics as { by_channel?: Record<string, number> } | null)?.by_channel,
+  });
   const recent = analytics?.recent_campaigns || [];
-
-  const openRate = totals.sent ? Math.round((totals.opened / totals.sent) * 100) : 0;
-  const clickRate = totals.sent ? Math.round((totals.clicked / totals.sent) * 100) : 0;
 
   return (
     <Card className="border-border/40 bg-card/60">
@@ -46,12 +41,20 @@ export function CampaignAnalyticsCard({ eventId }: { eventId?: string }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-4 gap-2 text-center">
-          <Stat label="Sent" value={totals.sent || 0} />
-          <Stat label="Opened" value={`${openRate}%`} />
-          <Stat label="Clicked" value={`${clickRate}%`} />
-          <Stat label="Failed" value={totals.failed || 0} />
+        <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-3">
+          <Stat label="People" value={totals.people} />
+          <Stat label="Emails" value={totals.emails} />
+          <Stat label="RSVP'd" value={totals.rsvped} />
+          <Stat label="Delivered" value={totals.delivered} />
+          <Stat label="Opened" value={totals.opened} />
+          <Stat label="Clicked" value={totals.clicked} />
         </div>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          {totals.logged} messages logged{totals.channelLine ? ` (${totals.channelLine})` : ""}.
+          {" "}Opens and clicks say “Not tracked” until a send includes the tracking pixel or a Resend delivery event.
+          RSVP'd counts people who opened the invite link and then RSVP'd. Older invites did not include that link.
+          {totals.failed > 0 ? ` ${totals.failed} failed.` : ""}
+        </p>
 
         {recent.length > 0 && (
           <div className="space-y-1.5 pt-2 border-t border-border/40">
@@ -62,7 +65,7 @@ export function CampaignAnalyticsCard({ eventId }: { eventId?: string }) {
                   <p className="truncate font-medium">{c.title || c.type}</p>
                   <p className="text-muted-foreground">{format(new Date(c.created_at), "MMM d, h:mm a")} · {c.type}</p>
                 </div>
-                <span className="text-muted-foreground shrink-0 ml-2">{c.sent_count}/{c.recipient_count}</span>
+                <span className="text-muted-foreground shrink-0 ml-2 text-right">{recentCampaignLabel(c.recipient_count, c.sent_count)}</span>
               </div>
             ))}
           </div>

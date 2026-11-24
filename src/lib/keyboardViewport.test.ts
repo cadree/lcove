@@ -1,0 +1,54 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { nativeKeyboardVisibleHeight, needsReveal, revealDelta, webKeyboardInset } from "./keyboardViewport.ts";
+import { feedVideoSource } from "./videoWindow.ts";
+
+test("keyboard height comes from the visual viewport, ignoring toolbar jitter", () => {
+  assert.equal(webKeyboardInset(844, 508, 0), 336);
+  assert.equal(webKeyboardInset(844, 508, 40), 296);
+  assert.equal(webKeyboardInset(844, 780, 0), 0);
+  assert.equal(webKeyboardInset(844, Number.NaN, 0), 0);
+});
+
+test("native keyboard never gets subtracted twice when WebView already resized", () => {
+  assert.equal(nativeKeyboardVisibleHeight(844, 844, 336), 508); // overlay
+  assert.equal(nativeKeyboardVisibleHeight(508, 844, 336), 508); // resize: body
+  assert.equal(nativeKeyboardVisibleHeight(508, 844, 0), 508);
+  assert.equal(nativeKeyboardVisibleHeight(844, 844, 0), 844);
+});
+
+test("fields under the keyboard are revealed, visible ones are left alone", () => {
+  assert.equal(needsReveal({ top: 631, bottom: 675 }, 0, 508), true);
+  assert.equal(needsReveal({ top: 442, bottom: 492 }, 0, 508), false);
+  assert.equal(needsReveal({ top: -20, bottom: 20 }, 0, 508), true);
+  assert.equal(revealDelta({ top: 442, bottom: 492 }, 0, 508), 4); // 20px space above keys
+  assert.equal(revealDelta({ top: 442, bottom: 482 }, 0, 508), 0);
+  assert.equal(revealDelta({ top: -20, bottom: 20 }, 0, 508), -40);
+  const delta = revealDelta({ top: 631, bottom: 675 }, 0, 508);
+  const centre = (631 + 675) / 2 - delta;
+  assert.ok(centre > 0 && centre < 508 - 24);
+});
+
+test("feed videos drop their source off screen and get an iOS first-frame hint", () => {
+  assert.equal(feedVideoSource("https://cdn/v.mp4", false), undefined);
+  assert.equal(feedVideoSource("https://cdn/v.mp4", true), "https://cdn/v.mp4#t=0.001");
+  assert.equal(feedVideoSource("blob:abc", true), "blob:abc");
+  assert.equal(feedVideoSource("https://cdn/v.mp4#t=2", true), "https://cdn/v.mp4#t=2");
+  assert.equal(feedVideoSource(null, true), undefined);
+  // Grid tiles without a saved cover show a frame 1s in (frame 0 is often black).
+  assert.equal(feedVideoSource("https://cdn/v.mp4", true, 1), "https://cdn/v.mp4#t=1");
+});
+
+test("the submit button rides along with the focused field when both fit", async () => {
+  const { revealTarget } = await import("./keyboardViewport.ts");
+  const field = { top: 400, bottom: 444 };
+  const submit = { top: 470, bottom: 514 };
+  assert.deepEqual(revealTarget(field, submit, 450), { top: 400, bottom: 514 });
+  // Too tall together: the field alone.
+  assert.deepEqual(revealTarget({ top: 0, bottom: 44 }, { top: 500, bottom: 544 }, 450), { top: 0, bottom: 44 });
+  // No button, or the button sits above the field.
+  assert.deepEqual(revealTarget(field, null, 450), field);
+  assert.deepEqual(revealTarget(field, { top: 100, bottom: 144 }, 450), field);
+  // On a 508px visible area the pair needs a scroll that shows the button too.
+  assert.ok(revealDelta(revealTarget({ top: 430, bottom: 474 }, { top: 500, bottom: 548 }, 508), 0, 508) >= 60);
+});

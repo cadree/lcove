@@ -1,5 +1,6 @@
 import React, { useState, KeyboardEvent, useEffect } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Shield, ArrowLeft, Search, User, RefreshCw, Save, X, Plus, Sparkles } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +20,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsAdmin, useAllUsers, useQuestionnaireResponses, useChangeAccessStatus } from '@/hooks/useAdmin';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+import { ApplicantSocialLinks } from "@/components/admin/ApplicantSocialLinks";
+import { MemberReferralReview } from "@/components/membership/MemberReferralReview";
 
 const MAX_PASSIONS = 10;
 const MIN_PASSION_LENGTH = 2;
@@ -35,6 +38,7 @@ interface UserProfile {
   access_status: string | null;
   onboarding_score: number | null;
   onboarding_completed: boolean | null;
+  social_links: Record<string, string> | null;
 }
 
 type AdminListUser = NonNullable<ReturnType<typeof useAllUsers>['data']>[number];
@@ -54,11 +58,13 @@ function toUserProfile(user: AdminListUser): UserProfile | null {
     access_status: user.access_status || null,
     onboarding_score: user.onboarding_score || null,
     onboarding_completed: user.onboarding_completed,
+    social_links: user.social_links && typeof user.social_links === 'object' && !Array.isArray(user.social_links)
+      ? user.social_links as Record<string, string>
+      : null,
   };
 }
 
 const AdminOnboarding: React.FC = () => {
-  const navigate = useNavigate();
   const { userId } = useParams<{ userId?: string }>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -284,9 +290,7 @@ const AdminOnboarding: React.FC = () => {
         {/* Header */}
         <div className="bg-gradient-to-b from-primary/10 to-background px-4 pt-6 pb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton label="Back" />
             <Shield className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">Onboarding Review</h1>
           </div>
@@ -307,7 +311,7 @@ const AdminOnboarding: React.FC = () => {
                 />
               </div>
 
-              <ScrollArea className="h-[500px]">
+              <div>
                 {loadingUsers ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
@@ -351,7 +355,7 @@ const AdminOnboarding: React.FC = () => {
                     })}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </div>
           ) : (
             <div className="space-y-6">
@@ -387,6 +391,19 @@ const AdminOnboarding: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Applicant links are required for new applications and visible to reviewers. */}
+              <Card>
+                <CardHeader><CardTitle className="text-lg">Application links</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <ApplicantSocialLinks
+                    links={selectedUser.social_links}
+                    emptyText="No application links on file (older account)."
+                  />
+                </CardContent>
+              </Card>
+
+              <MemberReferralReview applicantId={selectedUser.user_id} />
 
               {/* Status Control */}
               <Card>

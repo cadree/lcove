@@ -1,48 +1,73 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, ArrowLeft, User } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Camera, User } from 'lucide-react';
+import { displayNameError, prefillName } from '@/lib/displayName';
+import { MEMBER_OF_HINT, MEMBER_OF_LIMIT, memberOfError, normalizeMemberOf } from '@/lib/etherId';
+import { ProfilePhotoInput } from '@/components/profile/ProfilePhotoInput';
+import {
+  ONBOARDING_PHOTO_HINT,
+  ONBOARDING_PHOTO_REQUIRED,
+  ONBOARDING_PHOTO_TITLE,
+} from '@/lib/profilePhoto';
 
 interface Props {
   displayName: string;
+  memberOf: string;
   updateName: (name: string) => void;
+  updateMemberOf: (memberOf: string) => void;
   onNext: () => void;
-  onBack: () => void;
+  onBack?: () => void;
+  /** Hide the name field when sign-up already saved it. */
+  nameLocked?: boolean;
+  /** Photo chosen on this step, uploaded when onboarding finishes. Required to continue. */
+  avatarPreview?: string | null;
+  onAvatar?: (file: File | null) => void;
 }
 
-const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
-  const [name, setName] = useState(displayName);
+const OnboardingName = ({ displayName, memberOf, updateName, updateMemberOf, onNext, onBack, nameLocked = false, avatarPreview, onAvatar }: Props) => {
+  // A saved name that cannot pass validation (an email from AutoFill) stays
+  // editable; locking it left Continue failing with no visible error.
+  const locked = nameLocked && !displayNameError(displayName);
+  const [name, setName] = useState(() => prefillName(displayName));
+  const [member, setMember] = useState(memberOf);
   const [error, setError] = useState('');
+  const [memberError, setMemberError] = useState('');
+  const [photoError, setPhotoError] = useState('');
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // Sign-up metadata can arrive after the first render. Keep the locked name
+  // in local state so Continue is enabled.
+  useEffect(() => {
+    const suggested = prefillName(displayName);
+    if (suggested) setName((current) => current.trim() || suggested);
+  }, [displayName]);
+  useEffect(() => {
+    if (memberOf) setMember((current) => current || memberOf);
+  }, [memberOf]);
+  useEffect(() => {
+    if (avatarPreview) setPhotoError('');
+  }, [avatarPreview]);
 
   const handleNext = () => {
     const trimmedName = name.trim();
-    
-    if (!trimmedName) {
-      setError('Please enter your name to continue');
-      return;
-    }
-    
-    if (trimmedName.length < 2) {
-      setError('Name must be at least 2 characters');
-      return;
-    }
-    
-    if (trimmedName.length > 50) {
-      setError('Name must be less than 50 characters');
-      return;
-    }
-
-    // Basic validation - no special characters that could be problematic
-    const nameRegex = /^[a-zA-Z\s\-'.]+$/;
-    if (!nameRegex.test(trimmedName)) {
-      setError('Please use only letters, spaces, hyphens, or apostrophes');
+    const nextError = displayNameError(trimmedName);
+    const nextMemberError = memberOfError(member);
+    const nextPhotoError = onAvatar && !avatarPreview ? ONBOARDING_PHOTO_REQUIRED : '';
+    if (nextError || nextMemberError || nextPhotoError) {
+      setError(nextError || '');
+      setMemberError(nextMemberError || '');
+      setPhotoError(nextPhotoError);
       return;
     }
 
     setError('');
+    setMemberError('');
+    setPhotoError('');
     updateName(trimmedName);
+    updateMemberOf(normalizeMemberOf(member) || '');
     onNext();
   };
 
@@ -63,6 +88,7 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center mx-auto mb-6">
             <User className="w-8 h-8 text-primary-foreground" />
           </div>
+          <p className="text-primary text-sm font-medium mb-2">Step 1 of 5</p>
           <h1 className="font-display text-4xl md:text-5xl text-gradient-pink mb-3">
             What's your name?
           </h1>
@@ -78,6 +104,50 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
           transition={{ delay: 0.2 }}
           className="glass-strong rounded-2xl p-8 space-y-6 mb-8"
         >
+          {onAvatar && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  className="relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-border bg-background/60"
+                  onClick={() => photoInputRef.current?.click()}
+                  aria-invalid={photoError ? true : undefined}
+                  aria-describedby={photoError ? 'onboarding-photo-error' : 'onboarding-photo-hint'}
+                >
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="Your photo" className="h-full w-full object-cover" />
+                  ) : (
+                    <Camera className="h-7 w-7 text-muted-foreground" />
+                  )}
+                </button>
+                <ProfilePhotoInput
+                  ref={photoInputRef}
+                  id="onboarding-profile-photo"
+                  onFile={(file) => onAvatar(file)}
+                />
+                <div className="min-w-0 text-sm">
+                  <p className="font-medium text-foreground">{ONBOARDING_PHOTO_TITLE}</p>
+                  <p id="onboarding-photo-hint" className="text-muted-foreground">{ONBOARDING_PHOTO_HINT}</p>
+                  {avatarPreview && (
+                    <button type="button" className="mt-1 text-xs underline" onClick={() => onAvatar(null)}>
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+              {photoError && (
+                <p id="onboarding-photo-error" role="alert" className="text-destructive text-sm">
+                  {photoError}
+                </p>
+              )}
+            </div>
+          )}
+          {locked ? (
+            <div className="space-y-1">
+              <p className="text-base font-medium">Display Name</p>
+              <p className="text-lg text-foreground">{displayName}</p>
+            </div>
+          ) : (
           <div className="space-y-3">
             <Label htmlFor="displayName" className="text-base">
               Display Name
@@ -96,10 +166,14 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
               }}
               className="h-14 text-lg bg-background/50"
               maxLength={50}
-              autoFocus
+              autoFocus={!onAvatar}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? 'displayName-error' : 'displayName-hint'}
             />
             {error && (
               <motion.p
+                id="displayName-error"
+                role="alert"
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-destructive text-sm"
@@ -107,8 +181,37 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
                 {error}
               </motion.p>
             )}
-            <p className="text-muted-foreground text-xs">
-              Use your real name or a professional alias — this cannot be left empty
+            <p id="displayName-hint" className="text-muted-foreground text-xs">
+              Letters, spaces, hyphens, or apostrophes.
+            </p>
+          </div>
+          )}
+
+          <div className="space-y-3">
+            <Label htmlFor="memberOf" className="text-base">
+              Member of
+            </Label>
+            <Input
+              id="memberOf"
+              type="text"
+              placeholder="Your community or brand"
+              value={member}
+              maxLength={MEMBER_OF_LIMIT}
+              onChange={(e) => {
+                setMember(e.target.value);
+                if (memberError) setMemberError('');
+              }}
+              className="h-14 text-lg bg-background/50"
+              aria-invalid={memberError ? true : undefined}
+              aria-describedby={memberError ? 'memberOf-error' : 'memberOf-hint'}
+            />
+            {memberError && (
+              <p id="memberOf-error" role="alert" className="text-destructive text-sm">
+                {memberError}
+              </p>
+            )}
+            <p id="memberOf-hint" className="text-muted-foreground text-xs">
+              {MEMBER_OF_HINT}
             </p>
           </div>
         </motion.div>
@@ -120,17 +223,20 @@ const OnboardingName = ({ displayName, updateName, onNext, onBack }: Props) => {
           transition={{ delay: 0.3 }}
           className="flex items-center justify-between"
         >
-          <Button
-            variant="ghost"
-            onClick={onBack}
-            className="text-muted-foreground"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
+          {onBack ? (
+            <Button
+              variant="ghost"
+              onClick={onBack}
+              className="text-muted-foreground"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+          ) : (
+            <span />
+          )}
           <Button
             onClick={handleNext}
-            disabled={!name.trim()}
             className="h-12 px-6 bg-primary hover:bg-primary/90"
           >
             Continue

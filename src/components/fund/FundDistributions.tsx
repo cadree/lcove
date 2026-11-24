@@ -19,6 +19,7 @@ import {
 import { useUserIsAdmin } from '@/hooks/useUserIsAdmin';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
+import { readNumber } from "@/lib/numberField";
 
 const CATEGORY_OPTIONS: { value: FundCategory; label: string; color: string }[] = [
   { value: 'community_grants', label: 'Community Grants', color: 'hsl(330, 100%, 71%)' },
@@ -32,6 +33,7 @@ export function AddDistributionDialog() {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<FundCategory>('community_grants');
   const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [recipientName, setRecipientName] = useState('');
@@ -42,10 +44,16 @@ export function AddDistributionDialog() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+    const read = readNumber(amount, { label: 'Amount', min: 0.01, decimals: 2 });
+    if (read.error || read.value === null) {
+      setAmountError(read.error ?? 'Enter amount');
+      return;
+    }
+    setAmountError(null);
+
     createDistribution({
       category,
-      amount: parseFloat(amount),
+      amount: read.value,
       title,
       description: description || undefined,
       recipient_name: recipientName || undefined,
@@ -109,8 +117,10 @@ export function AddDistributionDialog() {
                 placeholder="500.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                aria-invalid={amountError ? true : undefined}
                 required
               />
+              {amountError && <p role="alert" className="text-xs text-destructive">{amountError}</p>}
             </div>
           </div>
 
@@ -297,12 +307,16 @@ export function RecentDistributionsCard({ recentDistributions }: {
 
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-border">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-xl font-serif flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-primary" />
+      <CardHeader className="flex w-full flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+        <CardTitle className="ether-title flex w-full min-w-0 items-center gap-2 text-xl sm:w-auto">
+          <DollarSign className="w-5 h-5 shrink-0 text-primary" />
           Recent Distributions
         </CardTitle>
-        {isAdmin && <AddDistributionDialog />}
+        {isAdmin && (
+          <div className="ml-auto max-w-full shrink-0">
+            <AddDistributionDialog />
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {!recentDistributions?.length ? (

@@ -73,6 +73,7 @@ function EditableTask({ task, onToggle, onUpdate, onDelete, onView }: EditableTa
     setIsSaving(true);
     try {
       await onUpdate(task.id, editTitle.trim(), editDueDate?.toISOString() || null);
+      toast.success("Task saved");
       setIsEditing(false);
     } catch {
       toast.error("Failed to update task");

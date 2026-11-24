@@ -7,6 +7,7 @@ import {
   Radio 
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 
 const benefits = [
   {
@@ -49,10 +50,7 @@ export function BenefitsGrid() {
       
       <div className="container relative px-4 sm:px-6 lg:px-8">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          {...revealMotion({ y: 20 })}
           className="text-center mb-12 md:mb-16"
         >
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-medium mb-4">
@@ -67,10 +65,7 @@ export function BenefitsGrid() {
           {benefits.map((benefit, index) => (
             <motion.div
               key={benefit.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.08 }}
+              {...revealMotion({ y: 20, delay: index * 0.08 })}
               className="group p-6 lg:p-8 rounded-2xl glass-subtle hover:glass transition-all duration-300"
             >
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">

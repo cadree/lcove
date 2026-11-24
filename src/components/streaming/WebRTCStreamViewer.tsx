@@ -1,25 +1,21 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Radio, Users, Loader2, WifiOff, RefreshCw } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { errorMessage } from '@/lib/errorMessage';
-
-function readRecord(payload: unknown): Record<string, unknown> {
-  if (typeof payload !== "object" || payload === null) return {};
-  return payload as unknown as Record<string, unknown>;
-}
-
-function asSessionDescription(value: unknown): RTCSessionDescriptionInit | null {
-  if (typeof value !== "object" || value === null) return null;
-  return value as unknown as RTCSessionDescriptionInit;
-}
-
-function asIceCandidate(value: unknown): RTCIceCandidateInit | null {
-  if (typeof value !== "object" || value === null) return null;
-  return value as unknown as RTCIceCandidateInit;
-}
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Room, RoomEvent, Track, type RemoteParticipant, type RemoteTrack } from "livekit-client";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Loader2, Radio, RefreshCw, Users, VideoOff, Volume2, WifiOff } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { errorMessage } from "@/lib/errorMessage";
+import { LIVE_VIDEO_NOT_CONFIGURED, nextTokenRefreshDelay, parseLiveKitTokenResponse, type LiveKitSession } from "@/lib/livekitSession";
+import { prepareVideoElement, setAudioSession } from "@/lib/livePhone";
+import {
+  EMPTY_VIEWER_PICTURE,
+  hostCameraOff,
+  reduceViewerPicture,
+  type ViewerPictureEvent,
+  type ViewerPictureState,
+} from "@/lib/liveViewer";
+import { shotViewerPreview } from "@/lib/shotSession";
+import { LIVE_REQUEST_TIMEOUT_MS, withDeadline } from "@/lib/withDeadline";
 
 interface WebRTCStreamViewerProps {
   streamId: string;
@@ -29,477 +25,357 @@ interface WebRTCStreamViewerProps {
   thumbnailUrl?: string | null;
 }
 
-export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({ 
-  streamId, 
+type ViewerPhase = "connecting" | "waiting" | "watching" | "reconnecting" | "offline" | "not-configured";
+
+async function requestLiveKitSession(streamId: string): Promise<LiveKitSession> {
+  if (shotViewerPreview()) return { configured: false, error: LIVE_VIDEO_NOT_CONFIGURED };
+  const invoke = supabase.functions.invoke("livekit-token", { body: { streamId } });
+  const { data, error } = await withDeadline(
+    invoke,
+    LIVE_REQUEST_TIMEOUT_MS,
+    "Live video did not respond. Try again.",
+  );
+  const parsed = parseLiveKitTokenResponse(data ?? { error: error?.message });
+  if ("configured" in parsed) return parsed;
+  throw new Error(parsed.error);
+}
+
+export const WebRTCStreamViewer: React.FC<WebRTCStreamViewerProps> = ({
+  streamId,
   hostId,
   isLive,
   viewerCount,
-  thumbnailUrl
+  thumbnailUrl,
 }) => {
-  const { user } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
-  const retryCountRef = useRef(0);
-  const offerSentRef = useRef(false); // Track if we've already sent an offer
-  const maxRetries = 5;
+  const roomRef = useRef<Room | null>(null);
+  const audioRef = useRef<HTMLMediaElement[]>([]);
+  const attemptRef = useRef(0);
+  const tokenTimerRef = useRef<number | null>(null);
+  const connectRef = useRef<() => Promise<void>>(async () => undefined);
+  const [phase, setPhase] = useState<ViewerPhase>("connecting");
 
-  const [isConnecting, setIsConnecting] = useState(true);
-  const [connectionState, setConnectionState] = useState<string>('connecting');
-  const [hasVideo, setHasVideo] = useState(false);
+  const clearTokenTimer = () => {
+    if (tokenTimerRef.current !== null) window.clearTimeout(tokenTimerRef.current);
+    tokenTimerRef.current = null;
+  };
+
+  const armTokenRefresh = (token: string) => {
+    clearTokenTimer();
+    const delay = nextTokenRefreshDelay(token);
+    if (delay === null) return;
+    tokenTimerRef.current = window.setTimeout(() => {
+      void connectRef.current();
+    }, delay);
+  };
+  const [picture, setPicture] = useState<ViewerPictureState>(EMPTY_VIEWER_PICTURE);
+  const [needsSound, setNeedsSound] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hostReady, setHostReady] = useState(false);
 
-  const cleanup = useCallback(() => {
-    console.log('[Viewer] Cleaning up...');
-    
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
+  const releaseAudio = () => {
+    for (const element of audioRef.current) {
+      element.pause();
+      element.srcObject = null;
+      element.remove();
     }
-    
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
-    
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
-    
-    pendingCandidatesRef.current = [];
-    offerSentRef.current = false;
-    setHostReady(false);
+    audioRef.current = [];
+  };
+
+  const disconnectRoom = useCallback(() => {
+    releaseAudio();
+    const room = roomRef.current;
+    roomRef.current = null;
+    room?.disconnect();
   }, []);
 
-  const sendOffer = useCallback(async (pc: RTCPeerConnection, channel: ReturnType<typeof supabase.channel>) => {
+  const unlockSound = useCallback(async () => {
+    const room = roomRef.current;
+    const video = videoRef.current;
+    setAudioSession(navigator, "playback");
     try {
-      // Only create offer if we haven't already sent one
-      if (offerSentRef.current) {
-        console.log('[Viewer] Offer already sent, skipping duplicate');
-        return;
-      }
-      
-      // Only create offer if signaling state allows
-      if (pc.signalingState === 'stable') {
-        offerSentRef.current = true;
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        
-        console.log('[Viewer] Sending offer to host');
-        await channel.send({
-          type: 'broadcast',
-          event: 'offer',
-          payload: { offer, senderId: user?.id },
-        });
-      }
-    } catch (err) {
-      console.error('[Viewer] Error creating/sending offer:', err);
-      offerSentRef.current = false; // Reset on error to allow retry
+      await room?.startAudio();
+    } catch {
+      /* The tap below still tries the element. */
     }
-  }, [user?.id]);
+    if (video) {
+      video.muted = false;
+      await video.play().catch(() => undefined);
+    }
+    for (const element of audioRef.current) {
+      element.muted = false;
+      await element.play().catch(() => undefined);
+    }
+    setNeedsSound(false);
+  }, []);
 
   const connect = useCallback(async () => {
-    if (!user || !isLive) {
-      console.log('[Viewer] Cannot connect - user:', !!user, 'isLive:', isLive);
-      return;
-    }
-    
-    cleanup();
-    
-    setIsConnecting(true);
+    if (!isLive) return;
+    const attempt = ++attemptRef.current;
+    clearTokenTimer();
+    disconnectRoom();
+    const still = () => attempt === attemptRef.current;
+    setPhase("connecting");
     setError(null);
-    setConnectionState('connecting');
-    setHasVideo(false);
-    pendingCandidatesRef.current = [];
-    offerSentRef.current = false;
+    setPicture(EMPTY_VIEWER_PICTURE);
+    setNeedsSound(false);
+    setAudioSession(navigator, "playback");
 
     try {
-      console.log('[Viewer] Connecting to stream:', streamId, 'Host:', hostId);
-      
-      // Create peer connection with TURN servers for NAT traversal
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
-          // OpenRelay TURN servers for NAT traversal (free tier)
-          {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-          },
-        ],
-        iceCandidatePoolSize: 10,
-      });
-      peerConnectionRef.current = pc;
+      const session = await requestLiveKitSession(streamId);
+      if (!still()) return;
+      if (!session.configured) {
+        setPhase("not-configured");
+        return;
+      }
 
-      // Handle incoming tracks from host
-      pc.ontrack = (event) => {
-        console.log('[Viewer] Received track:', event.track.kind);
-        if (videoRef.current && event.streams[0]) {
-          videoRef.current.srcObject = event.streams[0];
-          videoRef.current.play().catch(err => {
-            console.log('[Viewer] Autoplay blocked:', err);
-          });
-          setHasVideo(true);
-          setIsConnecting(false);
-          setConnectionState('connected');
-          retryCountRef.current = 0; // Reset retry count on success
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+        disconnectOnPageLeave: false,
+        webAudioMix: false,
+      });
+      roomRef.current = room;
+
+      const notePicture = (event: ViewerPictureEvent) => {
+        setPicture((current) => reduceViewerPicture(current, event));
+      };
+
+      const bindRemoteVideo = (video: HTMLVideoElement) => {
+        prepareVideoElement(video, "remote");
+        video.defaultMuted = true;
+        video.muted = true;
+        video.setAttribute("muted", "");
+        video.play().catch(() => setNeedsSound(true));
+      };
+
+      const attachHostTrack = (track: RemoteTrack, participant: RemoteParticipant) => {
+        if (participant.identity !== hostId || !still()) return;
+        if (track.kind === Track.Kind.Video && videoRef.current) {
+          const video = videoRef.current;
+          const muted = track.isMuted;
+          prepareVideoElement(video, "remote");
+          video.muted = true;
+          track.attach(video);
+          bindRemoteVideo(video);
+          notePicture({ type: "subscribed", kind: "video", muted });
+          if (!muted) {
+            setPhase("watching");
+            window.setTimeout(() => {
+              if (still() && videoRef.current === video) bindRemoteVideo(video);
+            }, 0);
+          }
+        }
+        if (track.kind === Track.Kind.Audio) {
+          const element = track.attach();
+          element.autoplay = true;
+          element.setAttribute("playsinline", "true");
+          audioRef.current.push(element);
+          notePicture({ type: "subscribed", kind: "audio", muted: track.isMuted });
+          element.play().then(() => setNeedsSound(false)).catch(() => setNeedsSound(true));
         }
       };
 
-      // Monitor connection state
-      pc.onconnectionstatechange = () => {
-        console.log('[Viewer] Connection state:', pc.connectionState);
-        setConnectionState(pc.connectionState);
-        
-        if (pc.connectionState === 'connected') {
-          setIsConnecting(false);
-          setError(null);
-          retryCountRef.current = 0;
-        } else if (pc.connectionState === 'failed') {
-          if (retryCountRef.current < maxRetries) {
-            retryCountRef.current++;
-            const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 10000);
-            console.log(`[Viewer] Connection failed, retrying in ${delay}ms (attempt ${retryCountRef.current}/${maxRetries})`);
-            reconnectTimeoutRef.current = setTimeout(() => {
-              if (isLive) connect();
-            }, delay);
-          } else {
-            setError('Unable to connect after multiple attempts');
-            setIsConnecting(false);
-          }
-        } else if (pc.connectionState === 'disconnected') {
-          // Try to reconnect after a short delay with exponential backoff
-          const delay = Math.min(2000 * Math.pow(1.5, retryCountRef.current), 15000);
-          reconnectTimeoutRef.current = setTimeout(() => {
-            if (isLive) {
-              console.log('[Viewer] Attempting reconnect...');
-              retryCountRef.current++;
-              connect();
-            }
-          }, delay);
-        }
-      };
-
-      pc.oniceconnectionstatechange = () => {
-        console.log('[Viewer] ICE state:', pc.iceConnectionState);
-      };
-
-      pc.onicegatheringstatechange = () => {
-        console.log('[Viewer] ICE gathering state:', pc.iceGatheringState);
-      };
-
-      // Set up signaling channel
-      const channel = supabase.channel(`stream-signaling-${streamId}`, {
-        config: { broadcast: { self: false } }
+      room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+        attachHostTrack(track, participant);
       });
-      channelRef.current = channel;
-
-      // Listen for host-ready signal
-      channel.on('broadcast', { event: 'host-ready' }, ({ payload }) => {
-        const data = readRecord(payload);
-        console.log('[Viewer] Host is ready:', data);
-        if (data.hostId === hostId) {
-          setHostReady(true);
-          // Send offer when host is ready (only if we haven't sent one yet)
-          if (!offerSentRef.current) {
-            console.log('[Viewer] Sending offer after host-ready signal');
-            sendOffer(pc, channel);
-          }
+      room.on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
+        track.detach();
+        if (participant.identity !== hostId || !still()) return;
+        if (track.kind === Track.Kind.Video) {
+          notePicture({ type: "unsubscribed", kind: "video" });
+          setPhase("waiting");
         }
+        if (track.kind === Track.Kind.Audio) notePicture({ type: "unsubscribed", kind: "audio" });
+      });
+      room.on(RoomEvent.TrackMuted, (publication, participant) => {
+        if (participant.identity !== hostId || !still()) return;
+        if (publication.kind === Track.Kind.Video) notePicture({ type: "muted", kind: "video" });
+      });
+      room.on(RoomEvent.TrackUnmuted, (publication, participant) => {
+        if (participant.identity !== hostId || !still()) return;
+        if (publication.kind !== Track.Kind.Video) return;
+        const video = videoRef.current;
+        if (video && publication.track) {
+          prepareVideoElement(video, "remote");
+          video.muted = true;
+          publication.track.attach(video);
+          bindRemoteVideo(video);
+        }
+        notePicture({ type: "unmuted", kind: "video" });
+        setPhase("watching");
+      });
+      room.on(RoomEvent.Reconnecting, () => {
+        if (still()) setPhase("reconnecting");
+      });
+      room.on(RoomEvent.Reconnected, () => {
+        if (still()) setPhase((current) => (current === "reconnecting" ? "watching" : current));
+      });
+      room.on(RoomEvent.Disconnected, () => {
+        if (roomRef.current !== room || !still()) return;
+        window.setTimeout(() => {
+          if (roomRef.current === room && still()) void connectRef.current();
+        }, 1000);
       });
 
-      // Listen for answer from host
-      channel.on('broadcast', { event: 'answer' }, async ({ payload }) => {
-        const data = readRecord(payload);
-        const answer = asSessionDescription(data.answer);
-        const senderId = typeof data.senderId === "string" ? data.senderId : "";
-        const targetId = typeof data.targetId === "string" ? data.targetId : undefined;
-        
-        // Only process answers meant for us from the host
-        if (senderId !== hostId) return;
-        if (targetId && targetId !== user.id) return;
-        
-        console.log('[Viewer] Received answer from host');
-        
-        try {
-          if (pc.signalingState === 'have-local-offer') {
-            if (!answer) throw new Error("Missing answer");
-            await pc.setRemoteDescription(new RTCSessionDescription(answer));
-            console.log('[Viewer] Set remote description');
-            
-            // Process any pending ICE candidates
-            console.log('[Viewer] Processing', pendingCandidatesRef.current.length, 'pending ICE candidates');
-            for (const candidate of pendingCandidatesRef.current) {
-              try {
-                await pc.addIceCandidate(new RTCIceCandidate(candidate));
-              } catch (err) {
-                console.error('[Viewer] Error adding pending ICE candidate:', err);
-              }
-            }
-            pendingCandidatesRef.current = [];
+      await withDeadline(
+        room.connect(session.url, session.token),
+        LIVE_REQUEST_TIMEOUT_MS,
+        "Could not join the live room. Try again.",
+      );
+      if (!still()) {
+        room.disconnect();
+        return;
+      }
+      room.remoteParticipants.forEach((participant) => {
+        participant.trackPublications.forEach((publication) => {
+          if (publication.track) {
+            attachHostTrack(publication.track, participant);
+            return;
           }
-        } catch (err) {
-          console.error('[Viewer] Error setting remote description:', err);
-        }
-      });
-
-      // Listen for ICE candidates from host
-      channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
-        const data = readRecord(payload);
-        const candidate = asIceCandidate(data.candidate);
-        const senderId = typeof data.senderId === "string" ? data.senderId : "";
-        const targetId = typeof data.targetId === "string" ? data.targetId : undefined;
-        
-        // Only accept candidates from the host meant for us
-        if (senderId !== hostId) return;
-        if (targetId && targetId !== user.id) return;
-        if (!candidate) return;
-        
-        console.log('[Viewer] Received ICE candidate from host');
-        
-        try {
-          if (pc.remoteDescription) {
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
-          } else {
-            // Queue the candidate for later
-            console.log('[Viewer] Queuing ICE candidate (no remote description yet)');
-            pendingCandidatesRef.current.push(candidate);
-          }
-        } catch (err) {
-          console.error('[Viewer] Error adding ICE candidate:', err);
-        }
-      });
-
-      // Subscribe to channel
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Channel subscription timeout'));
-        }, 10000);
-        
-        channel.subscribe((status) => {
-          console.log('[Viewer] Signaling channel status:', status);
-          if (status === 'SUBSCRIBED') {
-            clearTimeout(timeout);
-            resolve();
-          } else if (status === 'CHANNEL_ERROR') {
-            clearTimeout(timeout);
-            reject(new Error('Failed to subscribe to signaling channel'));
+          publication.setSubscribed(true);
+          if (participant.identity === hostId && publication.kind === Track.Kind.Video && publication.isMuted && still()) {
+            notePicture({ type: "muted", kind: "video" });
           }
         });
       });
-
-      // Send our ICE candidates to host
-      pc.onicecandidate = (event) => {
-        if (event.candidate && channelRef.current) {
-          console.log('[Viewer] Sending ICE candidate to host');
-          channelRef.current.send({
-            type: 'broadcast',
-            event: 'ice-candidate',
-            payload: { 
-              candidate: event.candidate.toJSON(), 
-              senderId: user.id,
-              targetId: hostId 
-            },
-          });
-        }
-      };
-
-      // Add transceivers to receive video/audio
-      pc.addTransceiver('video', { direction: 'recvonly' });
-      pc.addTransceiver('audio', { direction: 'recvonly' });
-
-      // Request host status by sending viewer-join
-      console.log('[Viewer] Sending viewer-join request');
-      await channel.send({
-        type: 'broadcast',
-        event: 'viewer-join',
-        payload: { viewerId: user.id },
-      });
-
-      // Wait a bit for host-ready signal before sending initial offer
-      // This gives time for the host to respond if already live
-      reconnectTimeoutRef.current = setTimeout(async () => {
-        // Only send offer if we haven't received host-ready yet
-        if (!offerSentRef.current && peerConnectionRef.current) {
-          console.log('[Viewer] No host-ready received yet, sending initial offer');
-          await sendOffer(pc, channel);
-        }
-      }, 1000);
-
-      // Set up connection timeout with retry mechanism
-      const connectionTimeout = setTimeout(() => {
-        if (peerConnectionRef.current?.connectionState !== 'connected' && !hasVideo && isLive) {
-          console.log('[Viewer] Connection timeout, attempting reconnect...');
-          retryCountRef.current++;
-          if (retryCountRef.current < maxRetries) {
-            connect();
-          } else {
-            setError('Unable to connect to stream after multiple attempts');
-            setIsConnecting(false);
-          }
-        }
-      }, 15000); // 15 second timeout for initial connection
-
-      // Store timeout to clear on cleanup
-      const existingTimeout = reconnectTimeoutRef.current;
-      reconnectTimeoutRef.current = connectionTimeout;
-      if (existingTimeout) clearTimeout(existingTimeout);
-
+      if (still()) {
+        armTokenRefresh(session.token);
+        setPhase((current) => (current === "connecting" ? "waiting" : current));
+      }
     } catch (err: unknown) {
-      console.error('[Viewer] Error connecting to stream:', err);
-      setError(errorMessage(err, 'Failed to connect'));
-      setConnectionState('failed');
-      setIsConnecting(false);
+      if (!still()) return;
+      setError(errorMessage(err, "Failed to connect"));
+      setPhase("offline");
     }
-  }, [streamId, hostId, user, isLive, cleanup, hasVideo, sendOffer]);
+  }, [disconnectRoom, hostId, isLive, streamId]);
+  connectRef.current = connect;
 
   useEffect(() => {
-    if (isLive && user) {
-      // Small delay to ensure host is ready
-      const timer = setTimeout(() => {
-        connect();
-      }, 300);
-      
-      return () => {
-        clearTimeout(timer);
-        cleanup();
-      };
-    }
-    
-    return cleanup;
-  }, [isLive, user, connect, cleanup]);
+    if (!isLive) return;
+    const timer = window.setTimeout(() => {
+      void connect();
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      clearTokenTimer();
+      attemptRef.current += 1;
+      disconnectRoom();
+    };
+  }, [connect, disconnectRoom, isLive]);
 
-  const handleRetry = () => {
-    retryCountRef.current = 0;
-    cleanup();
-    connect();
-  };
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible" || !isLive) return;
+      const room = roomRef.current;
+      if (!room || room.state === "disconnected") void connect();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [connect, isLive]);
 
   if (!isLive) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
-        {thumbnailUrl ? (
-          <div className="relative w-full h-full">
-            <img 
-              src={thumbnailUrl} 
-              alt="Stream thumbnail" 
-              className="w-full h-full object-cover opacity-50"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center bg-background/80 backdrop-blur-sm p-6 rounded-lg">
-                <WifiOff className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-foreground font-medium">Stream is offline</p>
-                <p className="text-sm text-muted-foreground">Check back when the host goes live</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center">
-            <WifiOff className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Stream is offline</p>
-          </div>
-        )}
+      <div data-testid="stream-ended" className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-background">
+        <div className="text-center">
+          <WifiOff className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
+          <p className="text-muted-foreground">This stream has ended</p>
+        </div>
       </div>
     );
   }
 
+  const showWaiting = phase === "waiting" || phase === "connecting" || phase === "reconnecting";
+  const cameraOff = hostCameraOff(picture, phase);
+
   return (
-    <div className="relative w-full h-full bg-black">
-      {/* Thumbnail background while connecting */}
-      {thumbnailUrl && isConnecting && (
-        <img 
-          src={thumbnailUrl} 
-          alt="Stream thumbnail" 
-          className="absolute inset-0 w-full h-full object-cover opacity-30"
-        />
+    <div className="relative h-full min-h-[34vh] w-full bg-black">
+      {thumbnailUrl && !picture.hasVideo && (
+        <img src={thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
       )}
-      
-      {/* Video */}
       <video
         ref={videoRef}
+        data-testid="viewer-video"
         autoPlay
         playsInline
-        className={`w-full h-full object-contain ${!hasVideo ? 'hidden' : ''}`}
+        muted
+        className="absolute inset-0 h-full w-full object-contain"
       />
 
-      {/* Connecting overlay */}
-      {isConnecting && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background/80">
-          <div className="text-center">
-            <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
-            <p className="text-foreground font-medium">Connecting to live stream...</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {hostReady ? 'Establishing connection with host' : 'Waiting for host...'}
+      {phase === "not-configured" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted/30 to-background/90">
+          <div className="max-w-sm px-4 text-center">
+            <Radio className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <p className="font-medium text-foreground">Live video not configured</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Camera streaming needs LiveKit credentials before anyone can watch.
             </p>
-            {retryCountRef.current > 0 && (
-              <p className="text-xs text-muted-foreground/60 mt-2">
-                Retry attempt {retryCountRef.current}/{maxRetries}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Error state */}
-      {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-destructive/10 to-background">
-          <div className="text-center">
-            <WifiOff className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <p className="text-foreground font-medium mb-2">Connection Error</p>
-            <p className="text-sm text-muted-foreground mb-4">{error}</p>
-            <Button onClick={handleRetry} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Retry Connection
+            <Button type="button" onClick={() => void connect()} variant="outline" size="sm" className="mt-4">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try again
             </Button>
           </div>
         </div>
       )}
 
-      {/* Audio only / waiting for video */}
-      {!isConnecting && !hasVideo && !error && connectionState === 'connected' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background">
-          <div className="text-center">
-            <Radio className="h-16 w-16 text-primary mx-auto mb-4 animate-pulse" />
-            <p className="text-muted-foreground">Waiting for video...</p>
+      {cameraOff && (
+        <div data-testid="host-camera-off" className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-muted/40 to-background/90">
+          <div className="px-4 text-center">
+            <VideoOff className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <p className="font-medium text-foreground">Host camera is off</p>
           </div>
         </div>
       )}
 
-      {/* Status badges */}
-      <div className="absolute top-4 left-4 flex gap-2 z-10">
-        {isLive && (
-          <Badge className="bg-red-500 animate-pulse">
-            <Radio className="h-3 w-3 mr-1" />
-            LIVE
-          </Badge>
-        )}
+      {showWaiting && !error && !cameraOff && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-background/80">
+          <div className="text-center">
+            {phase === "waiting" ? (
+              <Radio className="mx-auto mb-4 h-12 w-12 animate-pulse text-primary" />
+            ) : (
+              <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-primary" />
+            )}
+            <p className="font-medium text-foreground">
+              {phase === "waiting" ? "Waiting for host" : phase === "reconnecting" ? "Reconnecting…" : "Connecting to live stream..."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {phase === "offline" && (
+        <div data-testid="connection-dropped" className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-destructive/10 to-background">
+          <div className="px-4 text-center">
+            <WifiOff className="mx-auto mb-4 h-12 w-12 text-destructive" />
+            <p className="mb-2 font-medium text-foreground">Connection dropped</p>
+            <p className="mb-4 text-sm text-muted-foreground">{error || "The network dropped. Try again."}</p>
+            <Button onClick={() => void connect()} variant="outline" size="sm">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {needsSound && phase === "watching" && (
+        <Button
+          type="button"
+          data-testid="tap-for-sound"
+          className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2"
+          onClick={() => void unlockSound()}
+        >
+          <Volume2 className="mr-2 h-4 w-4" />
+          Tap for sound
+        </Button>
+      )}
+
+      <div className="absolute left-4 top-[max(0.75rem,env(safe-area-inset-top))] z-10 flex gap-2">
+        <Badge className="animate-pulse bg-red-500">
+          <Radio className="mr-1 h-3 w-3" />
+          LIVE
+        </Badge>
         <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
-          <Users className="h-3 w-3 mr-1" />
+          <Users className="mr-1 h-3 w-3" />
           {viewerCount}
         </Badge>
-        {connectionState === 'connected' && hasVideo && (
-          <Badge variant="outline" className="bg-green-500/20 text-green-500 border-green-500/30">
-            Connected
-          </Badge>
-        )}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import {
   Calendar, 
   Briefcase, 
   User,
+  Users,
   Filter
 } from "lucide-react";
 import {
@@ -22,6 +23,9 @@ interface CalendarFiltersProps {
   onCityChange: (city: string) => void;
   onStateChange: (state: string) => void;
   onTypesChange: (types: string[]) => void;
+  connectionsOnly?: boolean;
+  /** Omitted when signed out: there are no connections to filter by. */
+  onConnectionsOnlyChange?: (on: boolean) => void;
 }
 
 export function CalendarFilters({
@@ -33,6 +37,8 @@ export function CalendarFilters({
   onCityChange,
   onStateChange,
   onTypesChange,
+  connectionsOnly = false,
+  onConnectionsOnlyChange,
 }: CalendarFiltersProps) {
   const itemTypes = [
     { id: 'events', label: 'Events', icon: Calendar },
@@ -58,8 +64,9 @@ export function CalendarFilters({
             {selectedCity}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="glass-strong border-border/30 w-48 p-2">
-          <div className="space-y-1">
+        <PopoverContent className="glass-strong border-border/30 w-56 p-2">
+          <div className="max-h-64 space-y-1 overflow-y-auto">
+            {cities.length < 2 && <p className="px-3 py-2 text-xs text-muted-foreground">Cities appear here as events are added.</p>}
             {cities.map(city => (
               <button
                 key={city}
@@ -134,6 +141,18 @@ export function CalendarFilters({
           </div>
         </PopoverContent>
       </Popover>
+      {onConnectionsOnlyChange && (
+        <Button
+          variant={connectionsOnly ? "default" : "glass"}
+          size="sm"
+          className="gap-2"
+          aria-pressed={connectionsOnly}
+          onClick={() => onConnectionsOnlyChange(!connectionsOnly)}
+        >
+          <Users className="w-4 h-4" />
+          My connections
+        </Button>
+      )}
     </div>
   );
 }

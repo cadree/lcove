@@ -1,0 +1,654 @@
+/** 9:16 story frame and text overlays that burn into a still. */
+
+export const STORY_FRAME_WIDTH = 1080;
+export const STORY_FRAME_HEIGHT = 1920;
+
+export type StoryTextSize = "s" | "m" | "l";
+export type StoryTextFont = "sans" | "serif" | "display";
+
+export const STORY_TEXT_SIZES: Record<StoryTextSize, number> = {
+  s: 36,
+  m: 58,
+  l: 88,
+};
+
+export const STORY_TEXT_FONTS: Record<StoryTextFont, string> = {
+  sans: "Archivo, Helvetica, system-ui, sans-serif",
+  serif: "Fraunces, Georgia, serif",
+  display: "Cinzel, Georgia, serif",
+};
+
+export const STORY_TEXT_FONT_WEIGHT: Record<StoryTextFont, string> = {
+  sans: "650",
+  serif: "600",
+  display: "500",
+};
+
+export const STORY_TEXT_TRACKING: Record<StoryTextFont, number> = {
+  sans: 0.01,
+  serif: 0,
+  display: 0.08,
+};
+
+/** Max overlay width as a fraction of the frame. Scaled with the output resolution. */
+export const STORY_TEXT_MAX_WIDTH_RATIO = 0.8;
+export const STORY_TEXT_LINE_HEIGHT = 1.15;
+export const STORY_PILL_PAD_X = 0.45;
+export const STORY_PILL_PAD_Y = 0.12;
+
+export const STORY_TEXT_COLORS = [
+  "#FFFFFF",
+  "#111111",
+  "#F5E6C8",
+  "#C4142D",
+  "#2B4C7E",
+  "#E8A0BF",
+] as const;
+
+export const STORY_BACKGROUNDS = ["#111111", "#F4F0E8", "#1C1C22", "#C4142D"] as const;
+
+export interface StoryTextOverlay {
+  id: string;
+  text: string;
+  /** Horizontal center of the block, 0–1 of the frame. */
+  x: number;
+  /** Vertical center of the block, 0–1 of the frame. */
+  y: number;
+  size: StoryTextSize;
+  color: string;
+  font: StoryTextFont;
+  pill: boolean;
+  /** Two-finger pinch scale around the block centre (1 = the S/M/L size as laid out). */
+  scale?: number;
+  /** Two-finger twist in radians, clockwise. */
+  rotation?: number;
+}
+
+export const STORY_TEXT_SCALE_MIN = 0.4;
+export const STORY_TEXT_SCALE_MAX = 4;
+
+export function clampTextScale(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(STORY_TEXT_SCALE_MAX, Math.max(STORY_TEXT_SCALE_MIN, value));
+}
+
+/** Pinch scale and twist for an overlay; older overlays without them draw as before. */
+export function overlayTransform(overlay: Pick<StoryTextOverlay, "scale" | "rotation">): { scale: number; rotation: number } {
+  const scale = typeof overlay.scale === "number" ? clampTextScale(overlay.scale) : 1;
+  const rotation = typeof overlay.rotation === "number" && Number.isFinite(overlay.rotation) ? overlay.rotation : 0;
+  return { scale, rotation };
+}
+
+export interface TextLineBox {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface StoryTextLayout {
+  lines: TextLineBox[];
+  font: string;
+  fontSize: number;
+  color: string;
+  pillFill: string | null;
+  shadow: boolean;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export function createStoryText(partial: Partial<StoryTextOverlay> = {}): StoryTextOverlay {
+  return {
+    id: partial.id ?? `text-${Math.random().toString(36).slice(2, 8)}`,
+    text: partial.text ?? "",
+    x: partial.x ?? 0.5,
+    y: partial.y ?? 0.45,
+    size: partial.size ?? "m",
+    color: partial.color ?? "#FFFFFF",
+    font: partial.font ?? "sans",
+    pill: partial.pill ?? false,
+    scale: partial.scale ?? 1,
+    rotation: partial.rotation ?? 0,
+  };
+}
+
+export function fontSizeFor(size: StoryTextSize, frameWidth: number): number {
+  return STORY_TEXT_SIZES[size] * (frameWidth / STORY_FRAME_WIDTH);
+}
+
+export function canvasFont(font: StoryTextFont, fontSize: number): string {
+  return `${STORY_TEXT_FONT_WEIGHT[font]} ${fontSize}px ${STORY_TEXT_FONTS[font]}`;
+}
+
+export function storyFontFamily(font: StoryTextFont): string {
+  return STORY_TEXT_FONTS[font];
+}
+
+export function letterSpacingPx(font: StoryTextFont, fontSize: number): number {
+  return STORY_TEXT_TRACKING[font] * fontSize;
+}
+
+export function characterGapCount(text: string): number {
+  return Math.max(0, [...text].length - 1);
+}
+
+/** Width after adding CSS-style tracking between characters. */
+export function trackedTextWidth(
+  text: string,
+  untrackedWidth: number,
+  fontSize: number,
+  font: StoryTextFont,
+): number {
+  if (!text) return 0;
+  return untrackedWidth + characterGapCount(text) * letterSpacingPx(font, fontSize);
+}
+
+export function storyMaxTextWidth(frameWidth: number): number {
+  return frameWidth * STORY_TEXT_MAX_WIDTH_RATIO;
+}
+
+interface StoryMeasureContext {
+  font: string;
+  letterSpacing?: string;
+  measureText(text: string): { width: number };
+}
+
+let measureCanvas: HTMLCanvasElement | null = null;
+
+function storyMeasureContext(): StoryMeasureContext | null {
+  if (typeof document === "undefined") return null;
+  if (!measureCanvas) measureCanvas = document.createElement("canvas");
+  return measureCanvas.getContext("2d");
+}
+
+/**
+ * Measure a line with the shared canvas and the same tracking the editor and
+ * the burn-in pass use. Glyph width is measured with letter-spacing reset, then
+ * tracking is added so every environment agrees.
+ */
+export function measureStoryText(
+  text: string,
+  font: StoryTextFont,
+  fontSize: number,
+  ctx: StoryMeasureContext | null = storyMeasureContext(),
+): number {
+  if (!text) return 0;
+  if (!ctx) {
+    return trackedTextWidth(text, [...text].length * fontSize * 0.55, fontSize, font);
+  }
+  const previousFont = ctx.font;
+  const previousSpacing = ctx.letterSpacing;
+  ctx.font = canvasFont(font, fontSize);
+  if (ctx.letterSpacing !== undefined) ctx.letterSpacing = "0px";
+  const untracked = ctx.measureText(text).width;
+  ctx.font = previousFont;
+  if (previousSpacing !== undefined) ctx.letterSpacing = previousSpacing;
+  return trackedTextWidth(text, untracked, fontSize, font);
+}
+
+export function applyStoryTypography(
+  ctx: { font: string; letterSpacing?: string },
+  font: StoryTextFont,
+  fontSize: number,
+) {
+  ctx.font = canvasFont(font, fontSize);
+  if (ctx.letterSpacing !== undefined) {
+    ctx.letterSpacing = `${letterSpacingPx(font, fontSize)}px`;
+  }
+}
+
+/** Relative luminance of a hex color, or 1 when the value is unknown. */
+export function colorLuminance(color: string): number {
+  const hex = color.trim().replace(/^#/, "");
+  const full = hex.length === 3 ? hex.split("").map((c) => c + c).join("") : hex;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return 1;
+  const n = Number.parseInt(full, 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+export function contrastingFill(color: string): string {
+  return colorLuminance(color) > 0.55 ? "rgba(0,0,0,0.82)" : "rgba(255,255,255,0.94)";
+}
+
+export function wrapText(text: string, measure: (line: string) => number, maxWidth: number): string[] {
+  const source = text.replace(/\r\n/g, "\n");
+  const lines: string[] = [];
+  for (const paragraph of source.split("\n")) {
+    if (paragraph === "") {
+      lines.push("");
+      continue;
+    }
+    const words = paragraph.split(/\s+/);
+    let current = "";
+    for (const word of words) {
+      const next = current ? `${current} ${word}` : word;
+      if (measure(next) <= maxWidth) {
+        current = next;
+        continue;
+      }
+      if (current) lines.push(current);
+      if (measure(word) <= maxWidth) {
+        current = word;
+        continue;
+      }
+      let piece = "";
+      for (const ch of word) {
+        const trial = piece + ch;
+        if (piece && measure(trial) > maxWidth) {
+          lines.push(piece);
+          piece = ch;
+        } else {
+          piece = trial;
+        }
+      }
+      current = piece;
+    }
+    if (current || !lines.length) lines.push(current);
+  }
+  return lines.length ? lines : [""];
+}
+
+export function layoutStoryText(
+  overlay: StoryTextOverlay,
+  frameWidth: number,
+  frameHeight: number,
+  measure?: (text: string, font: string) => number,
+): StoryTextLayout {
+  const fontSize = fontSizeFor(overlay.size, frameWidth);
+  const font = canvasFont(overlay.font, fontSize);
+  const lineHeight = fontSize * STORY_TEXT_LINE_HEIGHT;
+  const maxWidth = storyMaxTextWidth(frameWidth);
+  const measureLine = (line: string) => {
+    if (!line) return 0;
+    if (measure) return trackedTextWidth(line, measure(line, font), fontSize, overlay.font);
+    return measureStoryText(line, overlay.font, fontSize);
+  };
+  const lines = wrapText(overlay.text, measureLine, maxWidth);
+  const widths = lines.map((line) => measureLine(line));
+  const blockWidth = Math.max(fontSize, ...widths);
+  const blockHeight = Math.max(lineHeight, lines.length * lineHeight);
+  const padX = overlay.pill ? fontSize * STORY_PILL_PAD_X : 0;
+  const padY = overlay.pill ? fontSize * STORY_PILL_PAD_Y : 0;
+  const width = blockWidth + padX * 2;
+  const height = blockHeight + padY * 2;
+  const centerX = overlay.x * frameWidth;
+  const centerY = overlay.y * frameHeight;
+  let left = centerX - width / 2;
+  let top = centerY - height / 2;
+  const margin = Math.max(8, frameWidth * 0.03);
+  left = Math.min(Math.max(left, margin), frameWidth - width - margin);
+  top = Math.min(Math.max(top, margin), frameHeight - height - margin);
+  const boxes: TextLineBox[] = lines.map((text, index) => {
+    const lineWidth = widths[index] ?? 0;
+    return {
+      text,
+      x: left + width / 2,
+      y: top + padY + index * lineHeight,
+      width: lineWidth,
+      height: lineHeight,
+    };
+  });
+  return {
+    lines: boxes,
+    font,
+    fontSize,
+    color: overlay.color,
+    pillFill: overlay.pill ? contrastingFill(overlay.color) : null,
+    shadow: !overlay.pill,
+    left,
+    top,
+    width,
+    height,
+  };
+}
+
+/** Push the stored center so the laid-out block stays on the frame. */
+export function clampOverlayCenter(
+  overlay: StoryTextOverlay,
+  frameWidth: number,
+  frameHeight: number,
+  measure?: (text: string, font: string) => number,
+): { x: number; y: number } {
+  const layout = layoutStoryText(overlay, frameWidth, frameHeight, measure);
+  return {
+    x: (layout.left + layout.width / 2) / frameWidth,
+    y: (layout.top + layout.height / 2) / frameHeight,
+  };
+}
+
+export function pointerToNormalized(
+  clientX: number,
+  clientY: number,
+  rect: { left: number; top: number; width: number; height: number },
+): { x: number; y: number } {
+  if (!(rect.width > 0) || !(rect.height > 0)) return { x: 0.5, y: 0.5 };
+  return {
+    x: Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)),
+    y: Math.min(1, Math.max(0, (clientY - rect.top) / rect.height)),
+  };
+}
+
+/** Source rectangle that covers a destination the way CSS object-fit: cover does. */
+export function coverSourceRect(
+  srcWidth: number,
+  srcHeight: number,
+  destWidth: number,
+  destHeight: number,
+): { sx: number; sy: number; sw: number; sh: number } {
+  if (!(srcWidth > 0) || !(srcHeight > 0) || !(destWidth > 0) || !(destHeight > 0)) {
+    return { sx: 0, sy: 0, sw: Math.max(0, srcWidth), sh: Math.max(0, srcHeight) };
+  }
+  const srcRatio = srcWidth / srcHeight;
+  const destRatio = destWidth / destHeight;
+  if (srcRatio > destRatio) {
+    const sw = srcHeight * destRatio;
+    return { sx: (srcWidth - sw) / 2, sy: 0, sw, sh: srcHeight };
+  }
+  const sh = srcWidth / destRatio;
+  return { sx: 0, sy: (srcHeight - sh) / 2, sw: srcWidth, sh };
+}
+
+export function fitStoryStage(maxWidth: number, maxHeight: number): { width: number; height: number } {
+  if (!(maxWidth > 0) || !(maxHeight > 0)) {
+    return { width: STORY_FRAME_WIDTH, height: STORY_FRAME_HEIGHT };
+  }
+  const ratio = STORY_FRAME_WIDTH / STORY_FRAME_HEIGHT;
+  if (maxWidth / maxHeight > ratio) {
+    return { width: maxHeight * ratio, height: maxHeight };
+  }
+  return { width: maxWidth, height: maxWidth / ratio };
+}
+
+export function storyFrameSize(minWidth = STORY_FRAME_WIDTH): { width: number; height: number } {
+  const width = Math.max(2, Math.round(minWidth));
+  const height = Math.round((width * STORY_FRAME_HEIGHT) / STORY_FRAME_WIDTH);
+  return { width: width % 2 === 0 ? width : width + 1, height: height % 2 === 0 ? height : height + 1 };
+}
+
+export interface StoryDrawContext {
+  canvas?: { width: number; height: number };
+  save(): void;
+  restore(): void;
+  translate(x: number, y: number): void;
+  scale(x: number, y: number): void;
+  rotate?(angle: number): void;
+  fillRect(x: number, y: number, w: number, h: number): void;
+  beginPath(): void;
+  fill(): void;
+  roundRect?(x: number, y: number, w: number, h: number, radii: number): void;
+  moveTo(x: number, y: number): void;
+  arcTo(x1: number, y1: number, x2: number, y2: number, r: number): void;
+  closePath(): void;
+  fillText(text: string, x: number, y: number): void;
+  measureText(text: string): { width: number };
+  drawImage(
+    image: CanvasImageSource,
+    sx: number,
+    sy: number,
+    sw: number,
+    sh: number,
+    dx: number,
+    dy: number,
+    dw: number,
+    dh: number,
+  ): void;
+  font: string;
+  fillStyle: string;
+  textAlign: string;
+  textBaseline: string;
+  letterSpacing?: string;
+  shadowColor: string;
+  shadowBlur: number;
+  shadowOffsetX: number;
+  shadowOffsetY: number;
+}
+
+function fillRoundRect(
+  ctx: StoryDrawContext,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radius: number,
+) {
+  const r = Math.max(0, Math.min(radius, w / 2, h / 2));
+  if (typeof ctx.roundRect === "function") {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    ctx.fill();
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+  ctx.fill();
+}
+
+export function drawStoryBackground(ctx: StoryDrawContext, width: number, height: number, color: string) {
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, width, height);
+}
+
+export function drawCoverImage(
+  ctx: StoryDrawContext,
+  image: CanvasImageSource & { width: number; height: number },
+  destWidth: number,
+  destHeight: number,
+) {
+  const srcW = Number(image.width) || 0;
+  const srcH = Number(image.height) || 0;
+  const crop = coverSourceRect(srcW, srcH, destWidth, destHeight);
+  if (!(crop.sw > 0) || !(crop.sh > 0)) return;
+  ctx.drawImage(image, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, destWidth, destHeight);
+}
+
+export function drawStoryOverlays(
+  ctx: StoryDrawContext,
+  overlays: StoryTextOverlay[],
+  frameWidth: number,
+  frameHeight: number,
+) {
+  for (const overlay of overlays) {
+    if (!overlay.text.trim()) continue;
+    // Same shared canvas metrics as the editor, after fonts.ready at the call site.
+    const layout = layoutStoryText(overlay, frameWidth, frameHeight);
+    const { scale, rotation } = overlayTransform(overlay);
+    ctx.save();
+    if (scale !== 1 || rotation !== 0) {
+      // Pinch and twist around the block centre; the editor hit box uses the same origin.
+      const cx = layout.left + layout.width / 2;
+      const cy = layout.top + layout.height / 2;
+      ctx.translate(cx, cy);
+      if (rotation !== 0) ctx.rotate?.(rotation);
+      ctx.scale(scale, scale);
+      ctx.translate(-cx, -cy);
+    }
+    applyStoryTypography(ctx, overlay.font, layout.fontSize);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    if (layout.pillFill) {
+      ctx.fillStyle = layout.pillFill;
+      for (const line of layout.lines) {
+        if (!line.text) continue;
+        const padX = layout.fontSize * STORY_PILL_PAD_X;
+        const padY = layout.fontSize * STORY_PILL_PAD_Y;
+        fillRoundRect(
+          ctx,
+          line.x - line.width / 2 - padX,
+          line.y - padY,
+          line.width + padX * 2,
+          line.height + padY,
+          (line.height + padY) / 2,
+        );
+      }
+    }
+    ctx.fillStyle = layout.color;
+    if (layout.shadow) {
+      const dark = colorLuminance(layout.color) <= 0.55;
+      ctx.shadowColor = dark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.55)";
+      // Shadows ignore the canvas transform, so scale them with the pinch by hand.
+      ctx.shadowBlur = layout.fontSize * 0.18 * scale;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = layout.fontSize * 0.04 * scale;
+    } else {
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    }
+    for (const line of layout.lines) {
+      if (!line.text) continue;
+      ctx.fillText(line.text, line.x, line.y);
+    }
+    ctx.restore();
+  }
+}
+
+export interface BurnStoryOptions {
+  width?: number;
+  height?: number;
+  background?: string;
+  image?: (CanvasImageSource & { width: number; height: number }) | null;
+  overlays: StoryTextOverlay[];
+  quality?: number;
+  createCanvas?: (width: number, height: number) => { canvas: { toBlob?: StoryCanvas["toBlob"]; toDataURL?: (type: string, quality?: number) => string }; ctx: StoryDrawContext };
+  waitForFonts?: () => Promise<void>;
+}
+
+interface StoryCanvas {
+  width: number;
+  height: number;
+  getContext(id: "2d"): StoryDrawContext | null;
+  toBlob?: (callback: (blob: Blob | null) => void, type?: string, quality?: number) => void;
+  toDataURL?: (type?: string, quality?: number) => string;
+}
+
+function defaultCreateCanvas(width: number, height: number) {
+  if (typeof document === "undefined") {
+    throw new Error("No canvas is available to render this story.");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("This browser cannot draw the story.");
+  return { canvas, ctx: ctx as unknown as StoryDrawContext };
+}
+
+async function canvasToJpeg(
+  canvas: { toBlob?: StoryCanvas["toBlob"]; toDataURL?: (type?: string, quality?: number) => string },
+  quality: number,
+): Promise<Blob> {
+  if (typeof canvas.toBlob === "function") {
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob!(resolve, "image/jpeg", quality));
+    if (blob && blob.size > 0) return blob;
+  }
+  if (typeof canvas.toDataURL === "function") {
+    const data = canvas.toDataURL("image/jpeg", quality);
+    const match = data.match(/^data:image\/jpeg;base64,(.+)$/);
+    if (match) {
+      const binary = atob(match[1]);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      return new Blob([bytes], { type: "image/jpeg" });
+    }
+  }
+  throw new Error("Could not save the story image.");
+}
+
+export async function burnStoryImage(options: BurnStoryOptions): Promise<File> {
+  const frame = storyFrameSize(options.width ?? STORY_FRAME_WIDTH);
+  const width = options.height ? frame.width : frame.width;
+  const height = options.height ?? frame.height;
+  if (options.waitForFonts) {
+    try {
+      await options.waitForFonts();
+    } catch {
+      // System fonts still render if a webfont is late.
+    }
+  }
+  const create = options.createCanvas ?? defaultCreateCanvas;
+  const { canvas, ctx } = create(width, height);
+  drawStoryBackground(ctx, width, height, options.background ?? "#111111");
+  if (options.image) drawCoverImage(ctx, options.image, width, height);
+  drawStoryOverlays(ctx, options.overlays, width, height);
+  const blob = await canvasToJpeg(canvas, options.quality ?? 0.92);
+  return new File([blob], "story.jpg", { type: "image/jpeg" });
+}
+
+export function imageFromFile(file: Blob): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not open that photo."));
+    };
+    image.src = url;
+  });
+}
+
+export async function waitForStoryFonts(): Promise<void> {
+  if (typeof document === "undefined" || !document.fonts) return;
+  const loads = (Object.keys(STORY_TEXT_FONTS) as StoryTextFont[]).map((font) => {
+    const family = STORY_TEXT_FONTS[font].split(",")[0]?.replace(/["']/g, "").trim();
+    const weight = STORY_TEXT_FONT_WEIGHT[font];
+    return family ? document.fonts.load(`${weight} ${STORY_TEXT_SIZES.m}px "${family}"`) : Promise.resolve([]);
+  });
+  await Promise.all([...loads, document.fonts.ready]);
+}
+
+/** Line texts the burn-in pass would paint, using the shared measure path. */
+export async function collectBurnedLines(
+  overlay: StoryTextOverlay,
+  frameWidth = STORY_FRAME_WIDTH,
+  frameHeight = STORY_FRAME_HEIGHT,
+): Promise<string[]> {
+  await waitForStoryFonts();
+  return layoutStoryText(overlay, frameWidth, frameHeight).lines.map((line) => line.text);
+}
+
+export interface StoryWysiwygHook {
+  layoutStoryText: typeof layoutStoryText;
+  measureStoryText: typeof measureStoryText;
+  waitForStoryFonts: typeof waitForStoryFonts;
+  collectBurnedLines: typeof collectBurnedLines;
+  burnStoryImage: typeof burnStoryImage;
+  STORY_FRAME_WIDTH: number;
+  STORY_FRAME_HEIGHT: number;
+  STORY_TEXT_MAX_WIDTH_RATIO: number;
+  overlays: StoryTextOverlay[];
+  background: string;
+}
+
+export function installStoryWysiwygHook(state: { overlays: StoryTextOverlay[]; background: string }) {
+  if (typeof window === "undefined") return;
+  const target = window as Window & { __storyWysiwyg?: StoryWysiwygHook };
+  target.__storyWysiwyg = {
+    layoutStoryText,
+    measureStoryText,
+    waitForStoryFonts,
+    collectBurnedLines,
+    burnStoryImage,
+    STORY_FRAME_WIDTH,
+    STORY_FRAME_HEIGHT,
+    STORY_TEXT_MAX_WIDTH_RATIO,
+    overlays: state.overlays,
+    background: state.background,
+  };
+}

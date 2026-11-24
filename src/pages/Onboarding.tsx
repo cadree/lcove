@@ -2,27 +2,37 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { identityFromMetadata } from '@/lib/pendingSignup';
+import { displayNameError, prefillName } from '@/lib/displayName';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import OnboardingIntro from '@/components/onboarding/OnboardingIntro';
 import OnboardingName from '@/components/onboarding/OnboardingName';
 import OnboardingPassions from '@/components/onboarding/OnboardingPassions';
 import OnboardingCity from '@/components/onboarding/OnboardingCity';
-import OnboardingSkills from '@/components/onboarding/OnboardingSkills';
-import OnboardingRoles from '@/components/onboarding/OnboardingRoles';
-import OnboardingQuestionnaire from '@/components/onboarding/OnboardingQuestionnaire';
-import OnboardingConnections from '@/components/onboarding/OnboardingConnections';
-import OnboardingCompletion from '@/components/onboarding/OnboardingCompletion';
+import OnboardingPledge from '@/components/onboarding/OnboardingPledge';
+import OnboardingProof from '@/components/onboarding/OnboardingProof';
+import { applicantLinksError, normalizeApplicantLink } from '@/lib/applicantLinks';
 import { buildUserPassionInserts } from '@/lib/onboardingPassions';
+import { memberOfError, normalizeMemberOf } from '@/lib/etherId';
+import { assertCleanText } from '@/lib/objectionableText';
+import { scoreRedFlags, clearQuizSeed, type ChoiceId } from '@/lib/onboardingQuiz';
+import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from '@/lib/onboardingDraft';
+import { takeEventReturn } from '../../functions/_shared/eventShare.js';
+import { accessPath } from '@/lib/accessPath';
+import { uploadAvatar } from '@/lib/avatarUpload';
+import { hasProfilePhoto, ONBOARDING_PHOTO_REQUIRED, ONBOARDING_PHOTO_SAVE_FAILED, onboardingPhotoMissing } from '@/lib/profilePhoto';
 
 export interface OnboardingData {
   displayName: string;
+  memberOf: string;
   passions: string[];
   passionSeriousness: number;
   city: string;
   cityDisplay: string;
   cityKey: string;
+  socialProfile: string;
+  website: string;
   skills: string[];
   roles: string[];
   questionnaireResponses: Record<number, 'A' | 'B' | 'C'>;
@@ -35,19 +45,35 @@ const Onboarding = () => {
   const { toast } = useToast();
 
   const [currentStep, setCurrentStep] = useState(0);
+  // The photo stays in memory (drafts are text only) and uploads when onboarding finishes.
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(avatarFile);
+    setAvatarPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [avatarFile]);
   const [initialized, setInitialized] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const saveErrorToast = useRef<{ dismiss: () => void } | null>(null);
   const [data, setData] = useState<OnboardingData>({
     displayName: '',
+    memberOf: '',
     passions: [],
     passionSeriousness: 5,
     city: '',
     cityDisplay: '',
     cityKey: '',
+    socialProfile: '',
+    website: '',
     skills: [],
     roles: [],
     questionnaireResponses: {}
   });
-  const [accessLevel, setAccessLevel] = useState<'level_1' | 'level_2' | 'level_3' | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -59,54 +85,108 @@ const Onboarding = () => {
   // from a ref so typing in the field does not re-run this effect.
   const displayNameRef = useRef(data.displayName);
   displayNameRef.current = data.displayName;
+  const memberOfRef = useRef(data.memberOf);
+  memberOfRef.current = data.memberOf;
   useEffect(() => {
-    if (profile?.display_name && !displayNameRef.current) {
-      setData(prev => ({ ...prev, displayName: profile.display_name || '' }));
+    const fromMeta = identityFromMetadata(user?.user_metadata);
+    if (!displayNameRef.current) {
+      const nextName = prefillName(profile?.display_name || fromMeta.displayName);
+      if (nextName) setData(prev => ({ ...prev, displayName: nextName }));
     }
-  }, [profile]);
+    if (!memberOfRef.current) {
+      const nextMember = profile?.member_of || fromMeta.memberOf || '';
+      if (nextMember) setData(prev => ({ ...prev, memberOf: nextMember }));
+    }
+  }, [profile, user]);
 
-  // Handle redirect for completed onboarding users
+  // Resume a mid-onboarding refresh. Completed profiles still go to the feed.
   useEffect(() => {
-    if (!profileLoading && !initialized && profile) {
-      setInitialized(true);
-      if (profile.onboarding_completed && profile.access_status !== 'banned') {
-        navigate('/feed');
-      }
+    if (authLoading || profileLoading || initialized || !user) return;
+    setInitialized(true);
+    if (profile?.onboarding_completed) {
+      clearOnboardingDraft(window.localStorage, user.id);
+      const next = accessPath(
+        { onboarding_completed: true, access_status: profile.access_status },
+        '/onboarding',
+      );
+      const hold = next === '/pending' || next === '/denied' || next === '/locked';
+      // An already-verified member who resumes a previous signup must not
+      // loop on /onboarding; /welcome checks for their approval event.
+      const afterApproval = profile.access_status === "active" ? "/welcome" : next;
+      navigate(hold ? next : (takeEventReturn() || afterApproval), { replace: true });
+      return;
     }
-  }, [profile, profileLoading, initialized, navigate]);
+    const draft = readOnboardingDraft(window.localStorage, user.id);
+    if (draft) {
+      setCurrentStep(draft.step);
+      setData(draft.data);
+    }
+  }, [authLoading, profile, profileLoading, initialized, navigate, user]);
 
-  // Scoring: A=1, B=2, C=3 points per question
-  // Threshold: >= 20 points (out of 30 max for 10 questions) = Level 2 (Accepted)
-  const ACCEPTANCE_THRESHOLD = 20;
+  useEffect(() => {
+    if (!user || !initialized || profile?.onboarding_completed) return;
+    writeOnboardingDraft(window.localStorage, user.id, { step: currentStep, data });
+  }, [user, initialized, profile?.onboarding_completed, currentStep, data]);
 
-  const calculateMindsetLevel = (responses: Record<number, 'A' | 'B' | 'C'>): {
+  const calculateMindsetLevel = (responses: Record<number, ChoiceId>): {
     level: 1 | 2;
     score: number;
+    passed: boolean;
   } => {
-    const score = Object.values(responses).reduce((sum, ans) => {
-      return sum + (ans === 'A' ? 1 : ans === 'B' ? 2 : 3);
-    }, 0);
-    const level = score >= ACCEPTANCE_THRESHOLD ? 2 : 1;
-    return { level, score };
+    const result = scoreRedFlags(responses);
+    return { level: result.level, score: result.score, passed: result.passed };
   };
 
   const handleComplete = async () => {
-    if (!user) return;
+    if (!user || saving) return;
+    saveErrorToast.current?.dismiss();
+    saveErrorToast.current = null;
+    setSaving(true);
 
-    // Final validation - name is required
-    if (!data.displayName.trim()) {
+    // Final validation - the name step checks the same rule.
+    const nameError = displayNameError(data.displayName);
+    if (nameError) {
       toast({
-        title: 'Name required',
-        description: 'Please go back and enter your name to complete onboarding.',
+        title: 'Check your name',
+        description: nameError,
         variant: 'destructive'
       });
-      setCurrentStep(1); // Go back to name step
+      setCurrentStep(0);
+      setSaving(false);
       return;
     }
 
-    const { level, score } = calculateMindsetLevel(data.questionnaireResponses);
-    const passedExam = score >= ACCEPTANCE_THRESHOLD;
-    setAccessLevel(passedExam ? 'level_2' : 'level_1');
+    const memberError = memberOfError(data.memberOf);
+    if (memberError) {
+      toast({ title: 'Member of', description: memberError, variant: 'destructive' });
+      setCurrentStep(0);
+      setSaving(false);
+      return;
+    }
+
+    if (onboardingPhotoMissing(avatarFile, profile?.avatar_url)) {
+      toast({ title: ONBOARDING_PHOTO_REQUIRED, variant: 'destructive' });
+      setCurrentStep(0);
+      setSaving(false);
+      return;
+    }
+
+    const reviewError = applicantLinksError(data.socialProfile, data.website);
+    if (reviewError) {
+      toast({ title: 'Review link required', description: reviewError, variant: 'destructive' });
+      setCurrentStep(3);
+      setSaving(false);
+      return;
+    }
+
+    if (!data.socialProfile.trim() && !(user.email && user.email_confirmed_at)) {
+      toast({ title: 'Email verification required', description: 'Verify your account email before submitting a website-only application.', variant: 'destructive' });
+      setCurrentStep(3);
+      setSaving(false);
+      return;
+    }
+
+    const { level, score, passed: passedExam } = calculateMindsetLevel(data.questionnaireResponses);
 
     try {
       // Save questionnaire responses
@@ -134,36 +214,65 @@ const Onboarding = () => {
         if (error) throw error;
       }
 
-      // Save skills
-      const { data: skills } = await supabase
-        .from('skills')
-        .select('id, name')
-        .in('name', data.skills);
-      if (skills && skills.length > 0) {
-        await supabase.from('user_skills').upsert(
-          skills.map(s => ({ user_id: user.id, skill_id: s.id })),
-          { onConflict: 'user_id,skill_id' }
-        );
+      // Tools and roles are no longer asked. A resumed draft can still save
+      // values the person already chose. Empty lists skip the query.
+      if (data.skills.length > 0) {
+        const { data: skills } = await supabase
+          .from('skills')
+          .select('id, name')
+          .in('name', data.skills);
+        if (skills && skills.length > 0) {
+          await supabase.from('user_skills').upsert(
+            skills.map(s => ({ user_id: user.id, skill_id: s.id })),
+            { onConflict: 'user_id,skill_id' }
+          );
+        }
       }
 
-      // Save creative roles
-      const { data: roles } = await supabase
-        .from('creative_roles')
-        .select('id, name')
-        .in('name', data.roles);
-      if (roles && roles.length > 0) {
-        await supabase.from('user_creative_roles').upsert(
-          roles.map(r => ({ user_id: user.id, role_id: r.id })),
-          { onConflict: 'user_id,role_id' }
-        );
+      if (data.roles.length > 0) {
+        const { data: roles } = await supabase
+          .from('creative_roles')
+          .select('id, name')
+          .in('name', data.roles);
+        if (roles && roles.length > 0) {
+          await supabase.from('user_creative_roles').upsert(
+            roles.map(r => ({ user_id: user.id, role_id: r.id })),
+            { onConflict: 'user_id,role_id' }
+          );
+        }
       }
 
-      sessionStorage.setItem('onboarding_just_completed', 'true');
-
-      // Finishing onboarding always grants access. The score is stored
-      // and passed_exam is derived (score >= 20). It does not lock anyone out.
-      await updateProfile({
+      // Access stays pending until a human approves entry. passed_exam records
+      // whether the red-flag count stayed under the threshold.
+      assertCleanText(data.memberOf);
+      let avatarUrl: string | null = profile?.avatar_url && hasProfilePhoto(profile.avatar_url)
+        ? profile.avatar_url
+        : null;
+      if (avatarFile) {
+        try {
+          avatarUrl = await uploadAvatar(user.id, avatarFile);
+        } catch {
+          toast({ title: ONBOARDING_PHOTO_SAVE_FAILED, variant: 'destructive' });
+          setCurrentStep(0);
+          setSaving(false);
+          return;
+        }
+      }
+      if (!hasProfilePhoto(avatarUrl)) {
+        toast({ title: ONBOARDING_PHOTO_REQUIRED, variant: 'destructive' });
+        setCurrentStep(0);
+        setSaving(false);
+        return;
+      }
+      const { error: profileError } = await updateProfile({
+        avatar_url: avatarUrl,
         display_name: data.displayName.trim(),
+        member_of: normalizeMemberOf(data.memberOf),
+        social_links: {
+          ...(profile?.social_links ?? {}),
+          social_profile: normalizeApplicantLink(data.socialProfile) || '',
+          website: normalizeApplicantLink(data.website) || '',
+        },
         city: data.city,
         city_display: data.cityDisplay,
         city_key: data.cityKey,
@@ -171,19 +280,26 @@ const Onboarding = () => {
         access_level: passedExam ? 'level_2' : 'level_1',
         onboarding_completed: true,
         mindset_level: level,
-        access_status: 'active',
+        onboarding_level: level,
+        access_status: 'pending',
         onboarding_score: score,
         passed_exam: passedExam,
       });
 
-      setCurrentStep(7);
+      if (profileError) throw profileError;
+      clearQuizSeed(window.sessionStorage);
+      clearOnboardingDraft(window.localStorage, user.id);
+
+      // A human still has to approve access. The pending screen is the next step.
+      navigate(takeEventReturn() || '/pending', { replace: true });
     } catch (error) {
       console.error('Error saving onboarding data:', error);
-      toast({
+      saveErrorToast.current = toast({
         title: 'Error saving data',
         description: 'Please try again.',
         variant: 'destructive'
       });
+      setSaving(false);
     }
   };
 
@@ -207,21 +323,23 @@ const Onboarding = () => {
   }
 
   const steps = [
-    <OnboardingIntro key="intro" onNext={nextStep} />,
-    <OnboardingName 
-      key="name" 
-      displayName={data.displayName} 
-      updateName={(name) => updateData({ displayName: name })} 
-      onNext={nextStep} 
-      onBack={prevStep} 
+    <OnboardingName
+      key="name"
+      displayName={data.displayName}
+      memberOf={data.memberOf}
+      updateName={(name) => updateData({ displayName: name })}
+      updateMemberOf={(memberOf) => updateData({ memberOf })}
+      onNext={nextStep}
+      nameLocked={Boolean((profile?.display_name || identityFromMetadata(user?.user_metadata).displayName || '').trim())}
+      avatarPreview={avatarPreview}
+      onAvatar={setAvatarFile}
     />,
     <OnboardingPassions key="passions" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
     <OnboardingCity key="city" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
-    <OnboardingSkills key="skills" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
-    <OnboardingRoles key="roles" data={data} updateData={updateData} onNext={nextStep} onBack={prevStep} />,
-    <OnboardingQuestionnaire key="questionnaire" data={data} updateData={updateData} onComplete={handleComplete} onBack={prevStep} />,
-    <OnboardingConnections key="connections" onComplete={() => setCurrentStep(8)} onBack={prevStep} />,
-    <OnboardingCompletion key="completion" accessLevel={accessLevel} />,
+    <OnboardingProof key="review-links" socialProfile={data.socialProfile} website={data.website}
+      verifiedEmail={user?.email && user.email_confirmed_at ? user.email : null}
+      updateLinks={updateData} onNext={nextStep} onBack={prevStep} />,
+    <OnboardingPledge key="pledge" onComplete={() => void handleComplete()} onBack={prevStep} submitting={saving} />,
   ];
 
   return (

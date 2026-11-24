@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { resolveHostIdentity } from "../_shared/host-email-identity.ts";
+import { eventDateLabel, eventStampLabel, eventTimeLabel } from "../_shared/event-time.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,7 +53,7 @@ serve(async (req) => {
 
     const { data: event } = await admin
       .from("events")
-      .select("id, title, start_date, venue, city")
+      .select("id, title, start_date, venue, city, timezone")
       .eq("id", body.eventId)
       .single();
     if (!event) throw new Error("Event not found");
@@ -61,7 +63,10 @@ serve(async (req) => {
       .select("id, attendee_user_id, attendee_email, attendee_name, attendee_phone, tier_id, status, created_at")
       .eq("event_id", body.eventId);
 
-    const statuses = body.filter?.status?.length ? body.filter.status : ["confirmed", "checked_in"];
+    const requested = body.filter?.status?.length ? body.filter.status : ["registered", "approved"];
+    const statuses = [...new Set(requested.flatMap((status) =>
+      status === "confirmed" || status === "checked_in" ? ["registered", "approved"] : [status]
+    ))];
     q = q.in("status", statuses);
     if (body.filter?.tierIds?.length) q = q.in("tier_id", body.filter.tierIds);
     if (body.filter?.purchasedAfter) q = q.gte("created_at", body.filter.purchasedAfter);
@@ -75,17 +80,11 @@ serve(async (req) => {
     }
 
     const channels = body.channels || { push: true, email: true, sms: false };
-    const eventTime = new Date(event.start_date).toLocaleString("en-US", {
-      weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-    });
+    const eventTime = eventStampLabel(event.start_date, event.timezone);
     const eventUrl = `https://etherbylcove.com/event/${event.id}`;
     const identity = await resolveHostIdentity(admin, body.eventId);
-    const eventDateLong = new Date(event.start_date).toLocaleDateString("en-US", {
-      weekday: "long", month: "long", day: "numeric", year: "numeric",
-    });
-    const eventTimeShort = new Date(event.start_date).toLocaleTimeString("en-US", {
-      hour: "numeric", minute: "2-digit",
-    });
+    const eventDateLong = eventDateLabel(event.start_date, event.timezone);
+    const eventTimeShort = eventTimeLabel(event.start_date, event.timezone);
     const eventPlace = event as unknown as { venue?: string | null; city?: string | null };
     const location = [eventPlace.venue, eventPlace.city].filter(Boolean).join(", ") || "Location TBA";
 
@@ -202,24 +201,6 @@ serve(async (req) => {
         } catch (e) { await logRow("email", "failed", String(e)); }
       }
 
-      // SMS
-      if (channels.sms && phone) {
-        const sid = Deno.env.get("TWILIO_ACCOUNT_SID");
-        const auth = Deno.env.get("TWILIO_AUTH_TOKEN");
-        const from = Deno.env.get("TWILIO_PHONE_NUMBER");
-        if (sid && auth && from) {
-          try {
-            const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-              method: "POST",
-              headers: { Authorization: `Basic ${btoa(`${sid}:${auth}`)}`, "Content-Type": "application/x-www-form-urlencoded" },
-              body: new URLSearchParams({ To: phone, From: from, Body: `${finalTitle}\n\n${finalBody}\n\n${eventUrl}` }),
-            });
-            if (r.ok) { await logRow("sms", "sent"); sentCount++; }
-            else await logRow("sms", "failed", `${r.status}`);
-          } catch (e) { await logRow("sms", "failed", String(e)); }
-        }
-      }
-
       // Throttle
       await new Promise(r => setTimeout(r, 80));
     }
@@ -236,7 +217,7 @@ serve(async (req) => {
     const msg = err instanceof Error ? err.message : String(err);
     log("ERROR", { msg });
     return new Response(JSON.stringify({ error: msg }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: httpStatusForError(err), headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

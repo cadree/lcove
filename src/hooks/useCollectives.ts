@@ -2,6 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { callRpc } from '@/lib/rpc';
+
+/** What join_group did: joined now, already a member, or asked an owner to approve. */
+export type GroupJoinResult = 'joined' | 'member' | 'requested';
 
 function participantCount(participants: unknown): number {
   if (!Array.isArray(participants)) return 0;
@@ -217,46 +221,17 @@ export function useJoinCollective() {
     mutationFn: async (conversationId: string) => {
       if (!user) throw new Error('Must be logged in');
 
-      // Check if join requests are enabled
-      const { data: conv } = await supabase
-        .from('conversations')
-        .select('visibility, join_requests_enabled')
-        .eq('id', conversationId)
-        .single();
-
-      if (conv?.visibility === 'public') {
-        // Direct join for public collectives
-        const { error } = await supabase
-          .from('conversation_participants')
-          .insert({
-            conversation_id: conversationId,
-            user_id: user.id,
-            role: 'member',
-          });
-
-        if (error) throw error;
-        return { type: 'joined' as const };
-      } else {
-        // Create join request for discoverable collectives
-        const { error } = await supabase
-          .from('collective_join_requests')
-          .insert({
-            conversation_id: conversationId,
-            user_id: user.id,
-          });
-
-        if (error) throw error;
-        return { type: 'requested' as const };
-      }
+      // The database decides: public groups (and approved requests) join at once,
+      // private and discoverable groups get a join request for an owner to approve.
+      const type = await callRpc<GroupJoinResult>('join_group', { p_conversation_id: conversationId });
+      return { type };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['collectives'] });
       queryClient.invalidateQueries({ queryKey: ['my-collectives'] });
-      if (result.type === 'joined') {
-        toast.success('You joined the collective!');
-      } else {
-        toast.success('Join request sent!');
-      }
+      if (result.type === 'joined') toast.success('You joined the collective!');
+      else if (result.type === 'member') toast.success("You're already in this collective");
+      else toast.success('Join request sent!');
     },
     onError: (error) => {
       toast.error('Failed to join: ' + error.message);

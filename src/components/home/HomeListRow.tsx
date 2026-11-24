@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 import { ChevronRight, LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -14,10 +15,7 @@ interface HomeListRowProps {
 const HomeListRow = ({ title, subtitle, meta, icon: Icon, link, index = 0 }: HomeListRowProps) => {
   return (
     <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      whileInView={{ opacity: 1, x: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.4, delay: index * 0.05 }}
+      {...revealMotion({ x: -10, duration: 0.4, delay: index * 0.05 })}
     >
       <Link to={link}>
         <motion.div 

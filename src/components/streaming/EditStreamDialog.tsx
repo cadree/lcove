@@ -181,12 +181,13 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
         <div className="space-y-6 py-4">
           {/* Cover Art */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Cover Art</Label>
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <Label className="min-w-0">Cover Art</Label>
               {thumbnailPreview && (
                 <Button
                   variant={isAdjustingFocal ? 'default' : 'outline'}
                   size="sm"
+                  className="max-w-full"
                   onClick={() => setIsAdjustingFocal(!isAdjustingFocal)}
                 >
                   <Move className="h-3 w-3 mr-1" />
@@ -197,13 +198,13 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
             {thumbnailPreview ? (
               <div 
                 ref={imageContainerRef}
-                className={`relative aspect-video rounded-lg overflow-hidden bg-muted ${isAdjustingFocal ? 'cursor-crosshair ring-2 ring-primary' : ''}`}
+                className={`relative aspect-video w-full min-w-0 max-w-full rounded-lg overflow-hidden bg-muted ${isAdjustingFocal ? 'cursor-crosshair ring-2 ring-primary' : ''}`}
                 onClick={handleFocalPointClick}
               >
                 <img
                   src={thumbnailPreview}
                   alt="Cover preview"
-                  className="w-full h-full object-cover"
+                  className="h-full w-full min-w-0 max-w-full object-cover"
                   style={{
                     objectPosition: `${focalPoint.x}% ${focalPoint.y}%`
                   }}
@@ -287,10 +288,10 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
           )}
         </div>
 
-        <div className="flex justify-between gap-2">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm">
+              <Button variant="destructive" size="sm" className="w-full sm:w-auto">
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
               </Button>
@@ -311,11 +312,11 @@ export const EditStreamDialog: React.FC<EditStreamDialogProps> = ({
             </AlertDialogContent>
           </AlertDialog>
 
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+            <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={isSaving || !title.trim()}>
+            <Button onClick={handleSave} disabled={isSaving || !title.trim()} className="w-full sm:w-auto">
               {isSaving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

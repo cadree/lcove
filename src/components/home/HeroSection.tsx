@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
-import lcBearLogo from "@/assets/lc-bear-logo.png";
+import { EtherWordmark } from "@/components/brand/EtherWordmark";
 import { usePlatformStats } from "@/hooks/usePlatformStats";
 
 const HeroSection = () => {
@@ -29,11 +29,7 @@ const HeroSection = () => {
           transition={{ duration: 0.6 }}
           className="mb-4 sm:mb-6"
         >
-          <img
-            src={lcBearLogo}
-            alt="LC Bear Logo"
-            className="w-16 h-16 sm:w-24 sm:h-24 md:w-32 md:h-32 mx-auto object-contain"
-          />
+          <EtherWordmark className="w-[20rem] max-w-full" />
         </motion.div>
 
         {/* Badge */}

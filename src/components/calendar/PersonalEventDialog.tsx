@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { useCreatePersonalItem } from "@/hooks/useCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 import { format } from "date-fns";
 import { Upload, X, Calendar, DollarSign, Link as LinkIcon, Ticket, Coins } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -95,7 +96,7 @@ export function PersonalEventDialog({
       toast.success('Image uploaded!');
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload image');
+      toast.error(errorMessage(error, 'Failed to upload image'));
     } finally {
       setIsUploadingImage(false);
     }

@@ -85,3 +85,34 @@ Signed-in callers, or a policy that applies only to `authenticated`.
 `apply_stream_tip(uuid, uuid, integer, text, text)`, `award_xp(uuid, text, uuid, integer)`, `calculate_reputation_score(uuid)`, `can_watch_network(uuid, uuid)`, `cancel_pending_store_order(uuid)`, `cancel_pending_ticket_order(uuid)`, `complete_store_credit_purchase(uuid, uuid, integer)`, `confirm_event_ticket_order(uuid, text)`, `confirm_store_card_order(uuid, text)`, `delete_email(text, bigint)`, `enqueue_email(text, jsonb)`, `is_user_blocked(uuid, uuid)`, `mark_store_order_refunded(text)`, `move_to_dlq(text, text, bigint, jsonb)`, `purge_user_personal_data(uuid)`, `read_email_batch(text, integer, integer)`.
 
 `can_watch_network` is only called by `cinema_playback` and `record_content_view`, which run as the function owner. `is_user_blocked` has no caller in the app or in a policy. `calculate_reputation_score` is called by `update_reputation_from_review`.
+
+## Ether ID
+
+`20261024190000_ether_id.sql` grants these itself.
+
+| Function | Class | Who can execute |
+| --- | --- | --- |
+| `get_ether_id_by_token(text)` | anon | `anon`, `authenticated`, `service_role`. Returns name, username, avatar, member since, and the live status. No birthday, reviews, or user id |
+| `get_my_ether_id()` | user | `authenticated`, `service_role`. `auth.uid()` only |
+| `refresh_my_ether_id_token()` | user | `authenticated`, `service_role` |
+| `ensure_ether_id_pass(text)` | user | `authenticated`, `service_role` |
+| `ether_id_card_for_service(uuid)` | internal | `service_role`. Also checks `auth.role()` |
+| `ether_id_pass_by_serial`, `ether_id_register_device`, `ether_id_unregister_device`, `ether_id_updated_serials`, `ether_id_pending_pushes`, `ether_id_mark_pushes` | internal | `service_role` |
+| `ether_member_status`, `ether_id_signature`, `ether_id_issue_token`, `ether_id_current_token`, `ether_id_user_from_token`, `ether_id_public_card`, `ether_id_owner_card` | internal | `service_role` |
+| `ether_id_protect_standing`, `ether_id_normalize_profile`, `ether_id_on_profile_status` | trigger | `service_role` |
+
+`ether_id_secret`, `ether_id_tokens`, `ether_id_passes`, `ether_id_registrations`, `ether_id_push_queue`, and `ether_id_runtime` have RLS on and no policies. `anon` and `authenticated` have no table grant.
+
+## Added with project collaborations
+
+`20261019194500_project_collaborations.sql` creates these and grants them itself. The lock migration above does not list them.
+
+| Function | Class | Who can execute |
+| --- | --- | --- |
+| `can_view_project(uuid, uuid)` | anon | `anon`, `authenticated`, `service_role`. Trusts the user id only when it is `auth.uid()` |
+| `can_read_conversation(uuid, uuid)` | anon | Same. Project owner reads every project chat. Posting still requires membership |
+| `share_messages_to_project_main(uuid[])` | user | `authenticated`, `service_role`. Caller must be a member of the subgroup |
+| `claim_chat_email_window(uuid, uuid)` | internal | `service_role` |
+| `enforce_project_conversation()` | trigger | `service_role` |
+| `enforce_project_chat_member()` | trigger | `service_role` |
+| `sync_project_calendar_visibility()` | trigger | `service_role` |

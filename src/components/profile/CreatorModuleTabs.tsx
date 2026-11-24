@@ -1,3 +1,4 @@
+import { FeedVideo } from "@/components/media/FeedVideo";
 import React from 'react';
 import { Camera, Utensils, Music2, Clapperboard, Plus, Play, Image as ImageIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -87,7 +88,7 @@ export const CreatorModuleTabs: React.FC<CreatorModuleTabsProps> = ({ userId, is
                 {portfolio?.map(item => (
                   <div key={item.id} className="aspect-square rounded-lg overflow-hidden bg-muted">
                     {item.media_type === 'video' ? (
-                      <video src={item.media_url} className="w-full h-full object-cover" />
+                      <FeedVideo loop={false} src={item.media_url} className="w-full h-full object-cover" />
                     ) : (
                       <img src={item.media_url} alt={item.title || ''} className="w-full h-full object-cover" />
                     )}
@@ -222,7 +223,7 @@ export const CreatorModuleTabs: React.FC<CreatorModuleTabsProps> = ({ userId, is
                     {video.thumbnail_url ? (
                       <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
                     ) : (
-                      <video src={video.video_url} className="w-full h-full object-cover" />
+                      <FeedVideo loop={false} src={video.video_url} className="w-full h-full object-cover" />
                     )}
                     <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity">
                       <Play className="h-8 w-8 text-white" />

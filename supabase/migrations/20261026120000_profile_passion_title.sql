@@ -1,0 +1,183 @@
+-- Passion title on the Ether ID cream bar.
+-- Free text the member types. Trimmed, at most 24 characters. Blank becomes null.
+-- Not filled from roles, skills, or user_passions.
+-- This file is not applied by the app. Apply it by hand with the other migrations.
+--
+-- "Users can update own profile" is USING (auth.uid() = user_id), so a member
+-- can change this column only on their own row. No new policy.
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS passion_title text;
+
+COMMENT ON COLUMN public.profiles.passion_title IS
+  'Short passion title the member types for the Ether ID. Trimmed, at most 24 characters. Empty stays empty.';
+
+ALTER TABLE public.profiles
+  DROP CONSTRAINT IF EXISTS profiles_passion_title_length;
+
+ALTER TABLE public.profiles
+  ADD CONSTRAINT profiles_passion_title_length
+  CHECK (passion_title IS NULL OR char_length(passion_title) <= 24);
+
+CREATE OR REPLACE FUNCTION public.ether_id_normalize_profile()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NEW.member_of IS NOT NULL THEN
+    NEW.member_of := btrim(NEW.member_of);
+    IF NEW.member_of = '' THEN
+      NEW.member_of := NULL;
+    ELSIF char_length(NEW.member_of) > 24 THEN
+      RAISE EXCEPTION 'member of is 24 characters or fewer'
+        USING ERRCODE = '23514';
+    ELSIF public.objectionable_text(NEW.member_of) THEN
+      RAISE EXCEPTION 'That member of isn''t allowed.'
+        USING ERRCODE = '23514';
+    END IF;
+  END IF;
+
+  IF NEW.passion_title IS NOT NULL THEN
+    NEW.passion_title := btrim(NEW.passion_title);
+    IF NEW.passion_title = '' THEN
+      NEW.passion_title := NULL;
+    ELSIF char_length(NEW.passion_title) > 24 THEN
+      RAISE EXCEPTION 'passion title is 24 characters or fewer'
+        USING ERRCODE = '23514';
+    ELSIF public.objectionable_text(NEW.passion_title) THEN
+      RAISE EXCEPTION 'That passion title isn''t allowed.'
+        USING ERRCODE = '23514';
+    END IF;
+  END IF;
+
+  IF NEW.username IS NOT NULL THEN
+    NEW.username := lower(regexp_replace(btrim(NEW.username), '^@+', ''));
+    IF NEW.username = '' THEN
+      NEW.username := NULL;
+    ELSIF NEW.username !~ '^[a-z0-9_]{3,20}$' THEN
+      RAISE EXCEPTION 'username must be 3 to 20 letters, numbers, or underscores'
+        USING ERRCODE = '23514';
+    ELSIF public.objectionable_text(NEW.username) THEN
+      RAISE EXCEPTION 'That username isn''t allowed.'
+        USING ERRCODE = '23514';
+    END IF;
+  END IF;
+
+  IF NEW.birthday_month IS NULL AND NEW.birthday_day IS NULL THEN
+    NEW.show_birthday := false;
+  ELSIF NEW.birthday_month IS NULL OR NEW.birthday_day IS NULL
+        OR NEW.birthday_month < 1 OR NEW.birthday_month > 12
+        OR NEW.birthday_day < 1 OR NEW.birthday_day > 31 THEN
+    RAISE EXCEPTION 'birthday needs a real month and day'
+      USING ERRCODE = '23514';
+  ELSE
+    BEGIN
+      PERFORM make_date(2024, NEW.birthday_month::int, NEW.birthday_day::int);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE EXCEPTION 'birthday is not a real month and day'
+        USING ERRCODE = '23514';
+    END;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS ether_id_normalize_profile ON public.profiles;
+CREATE TRIGGER ether_id_normalize_profile
+  BEFORE INSERT OR UPDATE OF username, birthday_month, birthday_day, show_birthday, member_of, passion_title
+  ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.ether_id_normalize_profile();
+
+-- Owner card passion is profiles.passion_title. The public verify payload
+-- stays the short list: name, username, avatar, status, member since.
+CREATE OR REPLACE FUNCTION public.ether_id_owner_card(p_user_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_public jsonb;
+  v_passion text;
+  v_avg numeric;
+  v_count integer;
+  v_projects integer;
+  v_month smallint;
+  v_day smallint;
+  v_show boolean;
+  v_birthday text;
+  v_review_label text;
+  v_member_of text;
+  v_city text;
+BEGIN
+  v_public := public.ether_id_public_card(p_user_id);
+  IF v_public IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT round(avg(rating)::numeric, 1), COUNT(*)::integer
+  INTO v_avg, v_count
+  FROM public.user_reviews
+  WHERE reviewed_user_id = p_user_id;
+
+  IF v_count = 0 THEN
+    v_avg := NULL;
+    v_review_label := 'No peer reviews';
+  ELSE
+    v_review_label := trim(to_char(v_avg, 'FM990.0'))
+      || ' average · '
+      || v_count::text
+      || CASE WHEN v_count = 1 THEN ' review' ELSE ' reviews' END;
+  END IF;
+
+  SELECT COUNT(DISTINCT p.id)::integer
+  INTO v_projects
+  FROM public.projects p
+  WHERE p.status = 'completed'
+    AND (
+      p.creator_id = p_user_id
+      OR EXISTS (
+        SELECT 1
+        FROM public.project_applications pa
+        WHERE pa.project_id = p.id
+          AND pa.applicant_id = p_user_id
+          AND pa.status = 'accepted'
+      )
+    );
+
+  SELECT birthday_month, birthday_day, show_birthday,
+         NULLIF(btrim(member_of), ''),
+         NULLIF(btrim(COALESCE(NULLIF(btrim(city_display), ''), NULLIF(btrim(city), ''))), ''),
+         NULLIF(btrim(passion_title), '')
+  INTO v_month, v_day, v_show, v_member_of, v_city, v_passion
+  FROM public.profiles
+  WHERE user_id = p_user_id;
+
+  IF v_show AND v_month IS NOT NULL AND v_day IS NOT NULL THEN
+    v_birthday := to_char(make_date(2024, v_month::int, v_day::int), 'FMMonth FMDD');
+  ELSE
+    v_birthday := NULL;
+  END IF;
+
+  RETURN v_public || jsonb_build_object(
+    'passion', v_passion,
+    'peer_review_average', v_avg,
+    'peer_review_count', v_count,
+    'peer_review_label', v_review_label,
+    'projects_completed', v_projects,
+    'projects_label', v_projects::text || ' completed',
+    'birthday_label', v_birthday,
+    'birthday_note', CASE WHEN v_birthday IS NULL THEN NULL ELSE 'self-reported' END,
+    'show_birthday', COALESCE(v_show, false),
+    'birthday_month', v_month,
+    'birthday_day', v_day,
+    'member_of', v_member_of,
+    'city', v_city
+  );
+END;
+$$;

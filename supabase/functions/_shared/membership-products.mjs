@@ -84,6 +84,15 @@ export function tierFromStripeSubscription(sub, env) {
   return null;
 }
 
+export const GRANT_ELIGIBILITY_DOLLARS = 50;
+
+// The membership page states grant eligibility after $50 contributed.
+// Tier does not waive that amount.
+export function isGrantEligible(lifetimeContribution) {
+  const amount = Number(lifetimeContribution || 0);
+  return Number.isFinite(amount) && amount >= GRANT_ELIGIBILITY_DOLLARS;
+}
+
 export function mapMembershipStatus(sub, eventType) {
   if (eventType === "customer.subscription.deleted" || eventType === "invoice.payment_failed") {
     return eventType === "invoice.payment_failed" ? "past_due" : "cancelled";

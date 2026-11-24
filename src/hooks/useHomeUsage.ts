@@ -51,7 +51,7 @@ export function useHomeUsage() {
         // Try to load from Supabase
         const [usageResult, prefsResult] = await Promise.all([
           supabase.from("home_usage").select("*").eq("user_id", user.id),
-          supabase.from("home_preferences").select("*").eq("user_id", user.id).single(),
+          supabase.from("home_preferences").select("*").eq("user_id", user.id).maybeSingle(),
         ]);
 
         if (usageResult.data && usageResult.data.length > 0) {

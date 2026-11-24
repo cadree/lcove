@@ -1,0 +1,50 @@
+{
+  "native": {
+    "202611170600": {
+      "current": null,
+      "bundles": {}
+    },
+    "202611222244": {
+      "current": "1.0.5-web.6",
+      "bundles": {
+        "1.0.5-web.1": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.1.zip",
+          "checksum": "1186cc5c073b252ab6c01adf1278e286d8f2590c76f3c043a8e454a3f2a1b9e3"
+        },
+        "1.0.5-web.2": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.2.zip",
+          "checksum": "99075ed48002074dc4f02646d07f86ebe0f1a7f41e949dcc1dc37d5e6ceeadaa"
+        },
+        "1.0.5-web.3": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.3.zip",
+          "checksum": "54020eba02e816c92302ff7ffd7c1cfab6cf944b1939982748281fd7d9238a1e"
+        },
+        "1.0.5-web.4": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.4.zip",
+          "checksum": "6eae84396ea128afe914dc4e5dafa9b68d0a437cf882025dc6b971f98d7b0c76"
+        },
+        "1.0.5-web.5": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.5.zip",
+          "checksum": "a2a6807cfef92c0372ac034163e36a3b40b4018e9475149ed070ba431fb2de21"
+        },
+        "1.0.5-web.6": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611222244-1.0.5-web.6.zip",
+          "checksum": "6dfbb34ff3f5c54ba1f2d2c8425600867d65e16278424627314b7fea2ff9ae0e"
+        }
+      }
+    },
+    "202611231300": {
+      "current": "1.0.6-web.2",
+      "bundles": {
+        "1.0.6-web.1": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611231300-1.0.6-web.1.zip",
+          "checksum": "a2a6807cfef92c0372ac034163e36a3b40b4018e9475149ed070ba431fb2de21"
+        },
+        "1.0.6-web.2": {
+          "url": "https://etherbylcove.com/native-updates/bundles/202611231300-1.0.6-web.2.zip",
+          "checksum": "6dfbb34ff3f5c54ba1f2d2c8425600867d65e16278424627314b7fea2ff9ae0e"
+        }
+      }
+    }
+  }
+}

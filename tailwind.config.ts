@@ -18,8 +18,11 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['Cormorant Garamond', 'Georgia', 'serif'],
-        body: ['DM Sans', 'system-ui', 'sans-serif'],
+        display: ["var(--profile-font, var(--font-display))", "Georgia", "serif"],
+        body: ["var(--font-body)", "system-ui", "sans-serif"],
+        sans: ["var(--font-sans, var(--font-body))", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+        lore: ["var(--font-lore)", "Georgia", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -80,9 +83,9 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
         xl: "calc(var(--radius) + 4px)",
-        "2xl": "calc(var(--radius) + 8px)",
+        "2xl": "16px",
         "3xl": "calc(var(--radius) + 16px)",
-        media: "2px",
+        media: "0px",
       },
       letterSpacing: {
         eyebrow: "0.16em",

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,18 +15,23 @@ import { useMusicProfile, PlatformLink, TrackInfo, AlbumInfo } from "@/hooks/use
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { errorMessage } from "@/lib/errorMessage";
+import { buildReleases } from "@/lib/musicCatalog";
+import { canExtractArtist, cleanMusicLinks, detectMusicPlatform, normalizeMusicUrl } from "@/lib/musicLinks";
+import { createArtistExtractor } from "@/lib/artistExtract";
 
 interface ConnectMusicDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Profile name used when there is no music profile yet, so Save is never a dead end. */
+  defaultName?: string | null;
 }
 
 const PLATFORM_OPTIONS = [
   { value: "spotify", label: "Spotify", placeholder: "https://open.spotify.com/artist/..." },
   { value: "apple_music", label: "Apple Music", placeholder: "https://music.apple.com/.../artist/..." },
   { value: "soundcloud", label: "SoundCloud", placeholder: "https://soundcloud.com/..." },
-  { value: "youtube_music", label: "YouTube Music", placeholder: "https://music.youtube.com/channel/..." },
+  { value: "youtube_music", label: "YouTube", placeholder: "https://music.youtube.com/watch?v=..." },
   { value: "tidal", label: "Tidal", placeholder: "https://tidal.com/browse/artist/..." },
   { value: "bandcamp", label: "Bandcamp", placeholder: "https://...bandcamp.com" },
   { value: "other", label: "Other", placeholder: "https://..." },
@@ -42,7 +47,7 @@ const slugToTitle = (slug: string) =>
     .trim()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
-export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogProps) => {
+export const ConnectMusicDialog = ({ open, onOpenChange, defaultName }: ConnectMusicDialogProps) => {
   const { user } = useAuth();
   const { musicProfile, saveMusicProfile, deleteMusicProfile } = useMusicProfile();
 
@@ -56,7 +61,21 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
   const [fetchingLinkIndex, setFetchingLinkIndex] = useState<number | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [extractError, setExtractError] = useState<{ index: number; message: string } | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [linkErrors, setLinkErrors] = useState<Record<number, string>>({});
+  const foundReleases = useMemo(() => buildReleases(albums, topTracks), [albums, topTracks]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  // Latest URL asked for per row; a slower earlier answer for the same row is dropped.
+  const latestRequestRef = useRef<Record<number, string>>({});
+  const pastedRef = useRef<Record<number, boolean>>({});
+  const extract = useMemo(
+    () =>
+      createArtistExtractor(async (url) =>
+        supabase.functions.invoke("fetch-artist-image", { body: { url } }),
+      ),
+    [],
+  );
 
   // Track which fields the USER manually edited — so extraction won't clobber them
   const userEditedRef = useRef<{ name: boolean; image: boolean }>({ name: false, image: false });
@@ -87,9 +106,11 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       userEditedRef.current = { name: !looksLikeUrl(savedName) && !!savedName, image: !!musicProfile.artist_image_url };
     } else {
       setLinks([{ platform: "spotify", url: "" }]);
+      const fallbackName = (defaultName || "").trim();
+      if (fallbackName && !looksLikeUrl(fallbackName)) setDisplayName((current) => current || fallbackName);
       userEditedRef.current = { name: false, image: false };
     }
-  }, [musicProfile]);
+  }, [musicProfile, defaultName]);
 
   // Cleanup debounce timers on unmount
   useEffect(() => {
@@ -130,50 +151,44 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
     };
   };
 
-  const fetchArtistData = async (url: string, index: number) => {
-    if (!url.trim()) return;
-    const isSpotify = url.includes("open.spotify.com/");
-    const isAppleMusic = url.includes("music.apple.com/");
-    if (!isSpotify && !isAppleMusic) return;
-    if (extractedUrlsRef.current.has(url)) {
-      console.log("[MusicExtract] skipping (already extracted):", url);
-      return;
-    }
+  const fetchArtistData = async (rawUrl: string, index: number) => {
+    const url = normalizeMusicUrl(rawUrl);
+    if (!url || !canExtractArtist(url)) return;
+    const isSpotify = detectMusicPlatform(url) === "spotify";
+    const isAppleMusic = detectMusicPlatform(url) === "apple_music";
+    if (extractedUrlsRef.current.has(url)) return;
+    latestRequestRef.current[index] = url;
 
-    console.log("[MusicExtract] starting extraction for:", url);
     setFetchingLinkIndex(index);
     setExtractError(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke("fetch-artist-image", {
-        body: { url },
-      });
+      const outcome = await extract(url);
+      // The row changed while this was loading; its newer link wins.
+      if (latestRequestRef.current[index] !== url) return;
 
-      console.log("[MusicExtract] raw response:", { data, error });
-
-      if (error) {
-        console.error("[MusicExtract] edge function error:", error);
-        setExtractError({ index, message: "Couldn't fetch info from this link. You can fill it manually." });
+      if (!outcome.ok) {
+        setExtractError({
+          index,
+          message: outcome.reason === "error"
+            ? "Couldn't reach Spotify or Apple Music just now. Your link still saves. Add your name below."
+            : "Link saved, but we couldn't read details from it. Add your name below.",
+        });
         return;
       }
-
-      if (!data) {
-        setExtractError({ index, message: "No data returned from this link." });
-        return;
-      }
+      const data = outcome.data;
 
       let appliedSomething = false;
 
       // Artist name — overwrite UNLESS user manually typed it
       if (data.artist_name && !userEditedRef.current.name) {
-        console.log("[MusicExtract] applying artist_name:", data.artist_name);
         setDisplayName(data.artist_name);
+        setNameError(null);
         appliedSomething = true;
       }
 
       // Artist image — overwrite UNLESS user manually uploaded
       if (data.image_url && !userEditedRef.current.image) {
-        console.log("[MusicExtract] applying image_url:", data.image_url);
         setArtistImage(data.image_url);
         appliedSomething = true;
       }
@@ -182,7 +197,6 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       if (Array.isArray(data.genres) && data.genres.length > 0) {
         setGenres((prev) => {
           const merged = Array.from(new Set([...prev, ...data.genres]));
-          console.log("[MusicExtract] genres merged:", merged);
           return merged;
         });
         appliedSomething = true;
@@ -192,8 +206,8 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       if (Array.isArray(data.top_tracks) && data.top_tracks.length > 0) {
         setTopTracks((prev) => {
           const existingNames = new Set(prev.map((t) => t.name?.toLowerCase()));
-          const newOnes = data.top_tracks.filter(
-            (t: TrackInfo) => t.name && !existingNames.has(t.name.toLowerCase())
+          const newOnes = (data.top_tracks as unknown as TrackInfo[]).filter(
+            (t) => t.name && !existingNames.has(t.name.toLowerCase())
           );
           return [...prev, ...newOnes];
         });
@@ -201,13 +215,12 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       }
 
       // Albums — merge by name, with fallback for /album/ URLs
-      const albumsFromData: AlbumInfo[] = Array.isArray(data.albums) ? [...data.albums] : [];
+      const albumsFromData: AlbumInfo[] = Array.isArray(data.albums) ? [...(data.albums as unknown as AlbumInfo[])] : [];
       if (albumsFromData.length === 0) {
         const fallback =
           (isAppleMusic && parseAppleMusicAlbumFallback(url, data.image_url)) ||
           (isSpotify && parseSpotifyAlbumFallback(url, data.image_url));
         if (fallback) {
-          console.log("[MusicExtract] using album fallback:", fallback);
           albumsFromData.push(fallback);
         }
       }
@@ -237,42 +250,44 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       extractedUrlsRef.current.add(url);
 
       if (appliedSomething) {
-        toast.success("Artist info extracted!");
+        toast.success("Filled in from your link");
       } else {
         setExtractError({
           index,
           message: "Link is valid but no extra info was found. Fill in the details manually.",
         });
       }
-    } catch (e) {
-      console.error("[MusicExtract] exception:", e);
-      setExtractError({ index, message: "Extraction failed. Please fill the fields manually." });
     } finally {
-      setFetchingLinkIndex(null);
+      if (latestRequestRef.current[index] === url) setFetchingLinkIndex(null);
     }
   };
 
   const handleLinkUrlChange = (index: number, url: string) => {
     const updated = [...links];
     updated[index] = { ...updated[index], url };
-
-    // Auto-detect platform
-    if (url.includes("open.spotify.com")) updated[index].platform = "spotify";
-    else if (url.includes("music.apple.com")) updated[index].platform = "apple_music";
-    else if (url.includes("soundcloud.com")) updated[index].platform = "soundcloud";
-    else if (url.includes("music.youtube.com") || url.includes("youtube.com/channel")) updated[index].platform = "youtube_music";
-    else if (url.includes("tidal.com")) updated[index].platform = "tidal";
-    else if (url.includes("bandcamp.com")) updated[index].platform = "bandcamp";
+    const normalized = normalizeMusicUrl(url);
+    const detected = normalized ? detectMusicPlatform(normalized) : "other";
+    if (detected !== "other") updated[index].platform = detected;
     setLinks(updated);
+    setLinkErrors((prev) => {
+      if (!(index in prev)) return prev;
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
 
-    // Debounced extraction
+    // One extraction path for typing and pasting. A paste goes out right away;
+    // typing waits for a pause.
     if (debounceTimers.current[index]) clearTimeout(debounceTimers.current[index]);
-    const isSpotify = url.includes("open.spotify.com/") && url.length > 30;
-    const isAppleMusic = url.includes("music.apple.com/") && url.length > 30;
-    if (isSpotify || isAppleMusic) {
+    const pasted = pastedRef.current[index];
+    pastedRef.current[index] = false;
+    if (normalized && canExtractArtist(normalized)) {
       debounceTimers.current[index] = setTimeout(() => {
-        fetchArtistData(url, index);
-      }, 400);
+        fetchArtistData(normalized, index);
+      }, pasted ? 0 : 500);
+    } else {
+      latestRequestRef.current[index] = "";
+      if (fetchingLinkIndex === index) setFetchingLinkIndex(null);
     }
   };
 
@@ -283,7 +298,12 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
   };
 
   const addLink = () => setLinks([...links, { platform: "spotify", url: "" }]);
-  const removeLink = (index: number) => setLinks(links.filter((_, i) => i !== index));
+  const removeLink = (index: number) => {
+    setLinks(links.filter((_, i) => i !== index));
+    setLinkErrors({});
+    setExtractError(null);
+    latestRequestRef.current = {};
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -310,7 +330,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
       toast.success("Artist image uploaded!");
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload image");
+      toast.error(errorMessage(error, "Failed to upload image"));
     } finally {
       setIsUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -319,13 +339,19 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
 
   const handleSave = async () => {
     const cleanName = displayName.trim();
+    const { links: validLinks, invalid } = cleanMusicLinks(links);
+    if (invalid.length > 0) {
+      setLinkErrors(Object.fromEntries(invalid.map((i) => [i, "This doesn't look like a link. Paste the full address from the app's Share button."])));
+      return;
+    }
     if (!cleanName || looksLikeUrl(cleanName)) {
-      toast.error("Please enter a valid Artist / Band name");
+      setNameError(looksLikeUrl(cleanName) ? "Use your artist or band name here, not a link." : "Add your artist or band name so people know whose music this is.");
+      nameInputRef.current?.focus();
+      nameInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
     setIsSaving(true);
 
-    const validLinks = links.filter(l => l.url.trim());
     const spotifyLink = validLinks.find(l => l.platform === "spotify");
     const appleMusicLink = validLinks.find(l => l.platform === "apple_music");
 
@@ -369,31 +395,111 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-4 sm:p-6" data-testid="connect-music-dialog">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Music className="w-5 h-5 text-primary" />
-            Connect Music Profile
+            Connect your music
           </DialogTitle>
           <DialogDescription>
-            Paste your streaming links — we'll auto-extract your artist info.
+            Paste a link from Spotify, Apple Music, SoundCloud or YouTube. Spotify and Apple Music links fill in your name and photo, and visitors get a player on your profile.
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        {/* Native scroll, not ScrollArea: inside a dialog that only has a max-height its
+            viewport never gets a height, so with the keyboard up the lower fields were
+            clipped and could not be reached. */}
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mx-4 px-4 sm:-mx-6 sm:px-6"
+          style={{ WebkitOverflowScrolling: "touch" }}
+          data-testid="connect-music-scroll"
+        >
           <div className="space-y-5 py-2">
+            {/* Platform Links */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Your links</Label>
+                <Button variant="ghost" size="sm" onClick={addLink} className="min-h-11 text-xs">
+                  <Plus className="w-3 h-3 mr-1" /> Add link
+                </Button>
+              </div>
+
+              {links.map((link, index) => (
+                <div key={index} className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={link.platform}
+                      onChange={(e) => handleLinkPlatformChange(index, e.target.value)}
+                      aria-label="Platform"
+                      className="h-11 rounded-md border border-input bg-background px-2 text-sm w-[118px] shrink-0"
+                    >
+                      {PLATFORM_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <Input
+                      value={link.url}
+                      onChange={(e) => handleLinkUrlChange(index, e.target.value)}
+                      onPaste={() => {
+                        // onChange runs next with the pasted text; send it without the typing delay.
+                        pastedRef.current[index] = true;
+                      }}
+                      inputMode="url"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      aria-label="Music link"
+                      aria-invalid={linkErrors[index] ? true : undefined}
+                      placeholder={PLATFORM_OPTIONS.find(p => p.value === link.platform)?.placeholder || "Paste URL..."}
+                      className="flex-1 min-w-0 h-11"
+                    />
+                    {links.length > 1 && (
+                      <Button variant="ghost" size="icon" aria-label="Remove link" className="h-11 w-11 shrink-0" onClick={() => removeLink(index)}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {fetchingLinkIndex === index && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Reading your link...
+                    </p>
+                  )}
+                  {linkErrors[index] && (
+                    <p role="alert" className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" /> {linkErrors[index]}
+                    </p>
+                  )}
+                  {extractError && extractError.index === index && (
+                    <p className="text-xs text-muted-foreground flex items-start gap-1">
+                      <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" /> {extractError.message}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
             {/* Artist / Band Name */}
             <div className="space-y-2">
-              <Label htmlFor="artist-name">Artist / Band Name *</Label>
+              <Label htmlFor="artist-name">Artist or band name</Label>
               <Input
                 id="artist-name"
+                ref={nameInputRef}
                 value={displayName}
                 onChange={(e) => {
                   setDisplayName(e.target.value);
+                  setNameError(null);
                   userEditedRef.current.name = e.target.value.trim().length > 0;
                 }}
-                placeholder="Auto-filled from URL or type manually"
+                placeholder="Filled in from your link, or type it"
+                className="h-11"
+                aria-invalid={nameError ? true : undefined}
+                aria-describedby={nameError ? "artist-name-error" : undefined}
               />
+              {nameError && (
+                <p id="artist-name-error" role="alert" className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" /> {nameError}
+                </p>
+              )}
             </div>
 
             {/* Artist Image */}
@@ -415,6 +521,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                   <Button
                     variant="outline"
                     size="sm"
+                    className="min-h-11"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingImage}
                   >
@@ -429,6 +536,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="min-h-11"
                       onClick={() => {
                         setArtistImage("");
                         userEditedRef.current.image = false;
@@ -447,63 +555,8 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                 />
               </div>
               {!artistImage && (
-                <p className="text-xs text-muted-foreground">Auto-pulled from your Spotify or Apple Music link</p>
+                <p className="text-xs text-muted-foreground">Filled in from a Spotify or Apple Music link, or upload one.</p>
               )}
-            </div>
-
-            {/* Platform Links */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Streaming Links</Label>
-                <Button variant="ghost" size="sm" onClick={addLink} className="h-7 text-xs">
-                  <Plus className="w-3 h-3 mr-1" /> Add Link
-                </Button>
-              </div>
-
-              {links.map((link, index) => (
-                <div key={index} className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={link.platform}
-                      onChange={(e) => handleLinkPlatformChange(index, e.target.value)}
-                      className="h-9 rounded-md border border-input bg-background px-2 text-sm min-w-[120px]"
-                    >
-                      {PLATFORM_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                    <Input
-                      value={link.url}
-                      onChange={(e) => handleLinkUrlChange(index, e.target.value)}
-                      onPaste={(e) => {
-                        // Force immediate extraction on paste
-                        const pasted = e.clipboardData.getData("text");
-                        if (pasted && (pasted.includes("open.spotify.com") || pasted.includes("music.apple.com"))) {
-                          if (debounceTimers.current[index]) clearTimeout(debounceTimers.current[index]);
-                          setTimeout(() => fetchArtistData(pasted.trim(), index), 50);
-                        }
-                      }}
-                      placeholder={PLATFORM_OPTIONS.find(p => p.value === link.platform)?.placeholder || "Paste URL..."}
-                      className="flex-1"
-                    />
-                    {links.length > 1 && (
-                      <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => removeLink(index)}>
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                  {fetchingLinkIndex === index && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Loader2 className="w-3 h-3 animate-spin" /> Extracting artist info...
-                    </p>
-                  )}
-                  {extractError && extractError.index === index && (
-                    <p className="text-xs text-destructive flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> {extractError.message}
-                    </p>
-                  )}
-                </div>
-              ))}
             </div>
 
             {/* Extracted Genres */}
@@ -514,7 +567,7 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
                   {genres.map((genre, i) => (
                     <Badge key={i} variant="secondary" className="text-xs">
                       {genre}
-                      <button onClick={() => setGenres(genres.filter((_, j) => j !== i))} className="ml-1">
+                      <button type="button" aria-label={`Remove ${genre}`} onClick={() => setGenres(genres.filter((_, j) => j !== i))} className="ml-1 -my-2 -mr-2 p-2">
                         <X className="w-3 h-3" />
                       </button>
                     </Badge>
@@ -523,68 +576,47 @@ export const ConnectMusicDialog = ({ open, onOpenChange }: ConnectMusicDialogPro
               </div>
             )}
 
-            {/* Extracted Top Tracks */}
-            {topTracks.length > 0 && (
-              <div className="space-y-2">
-                <Label>Top Tracks (extracted)</Label>
-                <div className="space-y-1">
-                  {topTracks.slice(0, 5).map((track, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm p-1.5 rounded bg-muted/50">
-                      {track.album_image && (
-                        <img src={track.album_image} alt="" className="w-8 h-8 rounded object-cover" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate text-foreground">{track.name}</p>
-                        {track.album_name && (
-                          <p className="text-xs text-muted-foreground truncate">{track.album_name}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {topTracks.length > 5 && (
-                    <p className="text-xs text-muted-foreground">+{topTracks.length - 5} more tracks</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Extracted Albums */}
-            {albums.length > 0 && (
-              <div className="space-y-2">
-                <Label>Albums (extracted)</Label>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {albums.slice(0, 6).map((album, i) => (
-                    <div key={i} className="shrink-0 w-20 text-center">
-                      {album.image_url ? (
-                        <img src={album.image_url} alt={album.name} className="w-20 h-20 rounded object-cover" />
+            {/* Everything read from the links, as it will look in the catalog */}
+            {foundReleases.length > 0 && (
+              <div className="space-y-2" data-testid="connect-music-found">
+                <Label>Found on your links</Label>
+                <div className="grid grid-cols-4 gap-2">
+                  {foundReleases.slice(0, 8).map((release) => (
+                    <div key={release.key} className="min-w-0">
+                      {release.cover ? (
+                        <img src={release.cover} alt={release.title} className="aspect-square w-full rounded object-cover" />
                       ) : (
-                        <div className="w-20 h-20 rounded bg-muted flex items-center justify-center">
-                          <Music className="w-6 h-6 text-muted-foreground" />
+                        <div className="flex aspect-square w-full items-center justify-center rounded bg-muted">
+                          <Music className="h-5 w-5 text-muted-foreground" />
                         </div>
                       )}
-                      <p className="text-xs mt-1 truncate text-foreground">{album.name}</p>
+                      <p className="mt-1 truncate text-[11px] text-foreground">{release.title}</p>
                     </div>
                   ))}
                 </div>
+                {foundReleases.length > 8 && (
+                  <p className="text-xs text-muted-foreground">+{foundReleases.length - 8} more on your music page</p>
+                )}
+                <p className="text-xs text-muted-foreground">Arrange these into sections from your music page.</p>
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-between pt-2 border-t border-border/30">
+        <div className="flex shrink-0 items-center justify-between gap-2 pt-2 border-t border-border/30">
           {musicProfile ? (
-            <Button variant="destructive" size="sm" onClick={handleDelete}>
+            <Button variant="destructive" size="sm" className="min-h-11" onClick={handleDelete}>
               <Trash2 className="w-4 h-4 mr-1" /> Remove
             </Button>
           ) : (
             <div />
           )}
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" className="min-h-11" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={isSaving || !displayName.trim() || looksLikeUrl(displayName)}>
+            <Button className="min-h-11" onClick={handleSave} disabled={isSaving} data-testid="connect-music-save">
               {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               Save
             </Button>

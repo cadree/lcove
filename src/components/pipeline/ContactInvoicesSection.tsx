@@ -1,3 +1,4 @@
+import { NumberInput } from "@/components/ui/number-input";
 import { useState, useRef } from "react";
 import { format } from "date-fns";
 import { FileText, Plus, Trash2, Send, Loader2, Image, X, Mail, Phone, Check, Clock } from "lucide-react";
@@ -12,6 +13,7 @@ import { useContactInvoices, ContactInvoice, InvoiceLineItem } from "@/hooks/use
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { errorMessage } from "@/lib/errorMessage";
 
 interface ContactInvoicesSectionProps {
   pipelineItemId: string;
@@ -27,8 +29,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
   const [selectedInvoice, setSelectedInvoice] = useState<ContactInvoice | null>(null);
   const [sendVia, setSendVia] = useState<'email' | 'sms'>('email');
   const [sendRecipient, setSendRecipient] = useState('');
-  const [senderName, setSenderName] = useState('');
-  const [senderEmail, setSenderEmail] = useState('');
+  const [payLinkId, setPayLinkId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newInvoice, setNewInvoice] = useState({
@@ -44,12 +45,12 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
   const updateLineItem = (index: number, field: keyof InvoiceLineItem, value: string | number) => {
     const updated = [...newInvoice.line_items];
     updated[index] = { ...updated[index], [field]: value };
-    
+
     // Recalculate total
     if (field === 'quantity' || field === 'unit_price') {
       updated[index].total = Number(updated[index].quantity) * Number(updated[index].unit_price);
     }
-    
+
     setNewInvoice({ ...newInvoice, line_items: updated });
   };
 
@@ -75,11 +76,11 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/invoices/${Date.now()}.${fileExt}`;
-      
+
       const { error: uploadError } = await supabase.storage
         .from('contact-media')
         .upload(fileName, file);
-      
+
       if (uploadError) throw uploadError;
 
       const { data: urlData } = supabase.storage
@@ -92,7 +93,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
       });
       toast.success("Image attached");
     } catch (error) {
-      toast.error("Failed to upload image");
+      toast.error(errorMessage(error, "Failed to upload image"));
     }
 
     if (fileInputRef.current) {
@@ -157,16 +158,34 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
         invoiceId: selectedInvoice.id,
         via: sendVia,
         recipient: sendRecipient.trim(),
-        senderName: senderName.trim() || undefined,
-        senderEmail: senderEmail.trim() || undefined,
       });
       setSendDialogOpen(false);
       setSelectedInvoice(null);
-      setSenderName('');
-      setSenderEmail('');
       toast.success(`Invoice sent via ${sendVia}`);
     } catch (error) {
       toast.error("Failed to send invoice");
+    }
+  };
+
+  const createPayLink = async (invoice: ContactInvoice) => {
+    setPayLinkId(invoice.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-invoice-checkout", {
+        body: { invoiceId: invoice.id },
+      });
+      if (error) throw error;
+      if (data?.needs_connect) {
+        toast.error(data.error || "Set up payouts in Wallet before sending a pay link");
+        return;
+      }
+      if (data?.error) throw new Error(data.error);
+      if (!data?.url) throw new Error("Stripe did not return a pay link");
+      await navigator.clipboard.writeText(data.url);
+      toast.success("Pay link copied. 10% of the payment goes to the community fund.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create a pay link");
+    } finally {
+      setPayLinkId(null);
     }
   };
 
@@ -261,22 +280,22 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Quantity</Label>
-                          <Input
-                            type="number"
+                          <NumberInput
+
                             min="1"
                             value={item.quantity}
-                            onChange={(e) => updateLineItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                            onValueChange={value => updateLineItem(index, 'quantity', value)}
                           />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Unit Price ($)</Label>
-                          <Input
-                            type="number"
+                          <NumberInput
+
                             min="0"
                             step="0.01"
                             placeholder="0.00"
                             value={item.unit_price || ''}
-                            onChange={(e) => updateLineItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                            onValueChange={value => updateLineItem(index, 'unit_price', value)}
                           />
                         </div>
                         <div className="space-y-1">
@@ -308,11 +327,11 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="tax-rate">Tax Rate (%)</Label>
-                  <Input
+                  <NumberInput min={0}
                     id="tax-rate"
-                    type="number"
+
                     value={newInvoice.tax_rate}
-                    onChange={(e) => setNewInvoice({ ...newInvoice, tax_rate: parseFloat(e.target.value) || 0 })}
+                    onValueChange={value => setNewInvoice({ ...newInvoice, tax_rate: value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -411,7 +430,7 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
       ) : invoices.length === 0 ? (
-        <div 
+        <div
           className="text-center py-6 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
           onClick={() => setIsDialogOpen(true)}
           role="button"
@@ -462,15 +481,28 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
                     </Button>
                   )}
                   {invoice.status === 'sent' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => handleMarkPaid(invoice)}
-                      role="button"
-                    >
-                      <Check className="w-3 h-3 mr-1" /> Mark Paid
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={payLinkId === invoice.id}
+                        onClick={() => createPayLink(invoice)}
+                      >
+                        {payLinkId === invoice.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                        Pay link
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => handleMarkPaid(invoice)}
+                        role="button"
+                      >
+                        <Check className="w-3 h-3 mr-1" /> Mark Paid
+                      </Button>
+                    </>
                   )}
                   <Button
                     variant="ghost"
@@ -496,35 +528,14 @@ export function ContactInvoicesSection({ pipelineItemId, contactEmail, contactPh
             <DialogTitle>Send Invoice</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Sender Info */}
-            <div className="p-3 bg-muted/30 rounded-lg space-y-3">
-              <p className="text-xs text-muted-foreground font-medium">Your Information (appears on invoice)</p>
-              <div className="space-y-2">
-                <Label htmlFor="sender-name">Your Name / Business Name</Label>
-                <Input
-                  id="sender-name"
-                  value={senderName}
-                  onChange={(e) => setSenderName(e.target.value)}
-                  placeholder="e.g., John's Photography"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sender-email">Your Email (for replies)</Label>
-                <Input
-                  id="sender-email"
-                  type="email"
-                  value={senderEmail}
-                  onChange={(e) => setSenderEmail(e.target.value)}
-                  placeholder="your@email.com"
-                />
-                <p className="text-xs text-muted-foreground">Clients will reply to this email address</p>
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              The invoice is sent from your profile name. Replies go to the email on your account.
+            </p>
 
             <div className="space-y-2">
               <Label>Send via</Label>
-              <Select 
-                value={sendVia} 
+              <Select
+                value={sendVia}
                 onValueChange={(v) => {
                   const method = v as 'email' | 'sms';
                   setSendVia(method);

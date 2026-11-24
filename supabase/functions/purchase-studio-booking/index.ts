@@ -3,6 +3,10 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { ledgerBalances } from "../_shared/credit-balances.ts";
 import { COMMUNITY_FUND_FEE_PERCENT } from "../_shared/fees.mjs";
+import { assertStripeTestKey } from "../_shared/stripe-mode.mjs";
+import { verifiedDestination } from "../_shared/creator-connect.mjs";
+import { sellerSetupIncompleteBody } from "../_shared/seller-payment-setup.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,7 +86,9 @@ serve(async (req) => {
       .select("stripe_connect_account_id")
       .eq("store_id", store.id)
       .maybeSingle();
-    const connectAccountId = storeSecrets?.stripe_connect_account_id ?? null;
+    const profileDestination = await verifiedDestination(supabaseAdmin, store.user_id);
+    const connectAccountId = profileDestination
+      || (store.payout_enabled ? storeSecrets?.stripe_connect_account_id ?? null : null);
 
     const totalPrice = booking.total_price || (item.price * (booking.duration_hours || 1));
     const totalCredits = booking.credits_spent || (item.credits_price ? item.credits_price * (booking.duration_hours || 1) : 0);
@@ -169,6 +175,13 @@ serve(async (req) => {
       );
 
     } else if (paymentType === "cash") {
+      // Card bookings go straight to the studio owner's connected account. No account, no checkout.
+      if (!connectAccountId) {
+        return new Response(JSON.stringify(sellerSetupIncompleteBody()), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
       if (!store.accepts_cash) {
         throw new Error("This store does not accept cash payments");
       }
@@ -177,7 +190,7 @@ serve(async (req) => {
         throw new Error("This item does not have a cash price");
       }
 
-      const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      const stripe = new Stripe(assertStripeTestKey(Deno.env.get("STRIPE_SECRET_KEY")), {
         apiVersion: "2025-08-27.basil",
       });
 
@@ -192,7 +205,7 @@ serve(async (req) => {
       const platformFeeAmount = Math.round(totalPrice * 100 * (COMMUNITY_FUND_FEE_PERCENT / 100));
       const sellerAmount = (totalPrice * 100) - platformFeeAmount;
 
-      // Create checkout session with or without Connect
+      // Create checkout session paid to the studio owner's connected account
       const sessionConfig: Stripe.Checkout.SessionCreateParams = {
         customer: customerId,
         customer_email: customerId ? undefined : user.email!,
@@ -221,20 +234,18 @@ serve(async (req) => {
         },
       };
 
-      // If seller has Stripe Connect enabled, use application fee
-      if (connectAccountId && store.payout_enabled) {
-        sessionConfig.payment_intent_data = {
-          application_fee_amount: platformFeeAmount,
-          transfer_data: {
-            destination: connectAccountId,
-          },
-        };
-        logStep("Using Stripe Connect with application fee", { 
-          platformFeeAmount, 
-          sellerAmount,
-          connectAccountId 
-        });
-      }
+      // The studio owner's connected account receives the charge; ETHER keeps the application fee.
+      sessionConfig.payment_intent_data = {
+        application_fee_amount: platformFeeAmount,
+        transfer_data: {
+          destination: connectAccountId,
+        },
+      };
+      logStep("Using Stripe Connect with application fee", {
+        platformFeeAmount,
+        sellerAmount,
+        connectAccountId
+      });
 
       const session = await stripe.checkout.sessions.create(sessionConfig);
 
@@ -247,7 +258,7 @@ serve(async (req) => {
           payment_type: "cash",
           seller_amount: sellerAmount / 100,
           platform_fee: platformFeeAmount / 100,
-          seller_payout_status: store.payout_enabled ? "processing" : "pending_setup",
+          seller_payout_status: "processing",
         })
         .eq("id", bookingId);
 
@@ -268,7 +279,7 @@ serve(async (req) => {
     logStep("ERROR", { message });
     return new Response(
       JSON.stringify({ error: message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: httpStatusForError(error) }
     );
   }
 });

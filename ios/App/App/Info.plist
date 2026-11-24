@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
     <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
@@ -35,43 +37,34 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<!-- CONFIRM WITH CADRE: this scheme is the placeholder bundle id.
-	     It must match src/config/nativeIds.ts and the Supabase redirect allow-list. -->
+	<!-- Auth return scheme. Must match NATIVE_APP_ID and the Supabase redirect allow-list. -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.etherbylcove.app</string>
+			<string>app.lovable.e07d9c457fd949f78f3cc7d5998be668</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.etherbylcove.app</string>
+				<string>app.lovable.e07d9c457fd949f78f3cc7d5998be668</string>
 			</array>
 		</dict>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Ether uses the camera when you go live and when you scan an event check-in code.</string>
+	<string>Ether uses the camera to take photos and videos for your stories and posts, to go live, and to scan event check-in codes.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Ether uses the microphone so people can hear you during a live stream.</string>
+	<string>Ether uses the microphone to record sound for your videos and stories, and so people can hear you when you go live.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Ether uses your photo library when you choose a picture for your profile, a post, an event, a message, or another upload.</string>
+	<string>Ether uses your photo library so you can choose photos and videos for your posts, stories, messages, events, and profile.</string>
 	<!-- iOS has no usage-description key for notifications. The system permission
 	     dialog does not take a custom sentence. Ether asks so it can deliver
 	     messages, event reminders, and community alerts. Remote delivery needs
 	     APNs, which requires a paid Apple Developer account. -->
 	<key>UIBackgroundModes</key>
 	<array>
+		<string>audio</string>
 		<string>remote-notification</string>
 	</array>
 </dict>

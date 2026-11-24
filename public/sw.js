@@ -111,6 +111,8 @@ self.addEventListener("notificationclick", (event) => {
         targetPath = `/calendar?event=${notificationData.event_id}`;
       } else if ((notificationType === "like" || notificationType === "comment") && notificationData.post_id) {
         targetPath = `/feed?post=${notificationData.post_id}`;
+      } else if (notificationType === "match" && /^[0-9a-f-]{36}$/i.test(String(notificationData.user_id || ""))) {
+        targetPath = `/explore?section=people&connected=${notificationData.user_id}`;
       }
 
       // Ensure same-origin URL

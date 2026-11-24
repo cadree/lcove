@@ -1,0 +1,6 @@
+tfjs-backend-wasm.wasm and tfjs-backend-wasm-simd.wasm
+Copyright 2019 The TensorFlow Authors. All Rights Reserved.
+Source: @tensorflow/tfjs-backend-wasm@4.22.0
+The threaded build is not included. It needs cross-origin isolation.
+
+Licensed under the Apache License, Version 2.0. See LICENSE in this directory.

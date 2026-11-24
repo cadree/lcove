@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
+import { parseCalendarDate } from "@/lib/calendarDate";
 import {
   Calendar,
   MapPin,
@@ -21,6 +22,7 @@ import {
   Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/navigation/BackButton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -46,6 +48,13 @@ import { shareLink, buildShareUrl } from "@/lib/shareLink";
 import { cn } from "@/lib/utils";
 import { ProjectDetail } from "@/components/projects/ProjectDetail";
 import type { Project } from "@/hooks/useProjects";
+import { formatRoleCompensation } from "@/lib/projectCollaborations";
+import { inviteParam } from "@/lib/itemInvite";
+import { applyWithInvite } from "@/lib/itemInviteApi";
+import { messageHref } from "@/lib/connectMoment";
+import { ProjectWrapUp } from "@/components/vouches/ProjectWrapUp";
+import { ProjectOpenCalls } from "@/components/openCalls/ProjectOpenCalls";
+import { scrollToRoles, useRoleFromLink } from "@/hooks/useRoleFromLink";
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -66,7 +75,10 @@ const statusLabels: Record<string, string> = {
 export default function PublicProjectPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+  // Arrived from an invite's Join: show the role picker and apply through it.
+  const inviteId = user ? inviteParam(location.search) : null;
   const queryClient = useQueryClient();
 
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
@@ -122,6 +134,9 @@ export default function PublicProjectPage() {
   const applyMutation = useMutation({
     mutationFn: async ({ roleId, message }: { roleId: string; message: string }) => {
       if (!user?.id) throw new Error("Not authenticated");
+      if (inviteId) {
+        return applyWithInvite(inviteId, projectId!, roleId, message || null);
+      }
       const { error } = await supabase.from("project_applications").insert({
         project_id: projectId!,
         role_id: roleId,
@@ -131,39 +146,27 @@ export default function PublicProjectPage() {
       if (error) throw error;
 
       try {
-        const { data: proj } = await supabase
-          .from("projects")
-          .select("title, creator_id")
-          .eq("id", projectId!)
-          .single();
-        const { data: role } = await supabase
-          .from("project_roles")
-          .select("role_name")
-          .eq("id", roleId)
-          .single();
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("display_name")
-          .eq("user_id", user.id)
-          .single();
-        if (proj && role) {
-          await supabase.functions.invoke("notify-new-application", {
-            body: {
-              project_id: projectId,
-              project_creator_id: proj.creator_id,
-              project_title: proj.title,
-              role_title: role.role_name,
-              applicant_name: profile?.display_name || "Someone",
-            },
-          });
-        }
+        await supabase.functions.invoke("notify-new-application", {
+          body: { project_id: projectId },
+        });
       } catch {
         // Application already succeeded; notification failure is non-fatal.
       }
+      return null;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["my-project-applications"] });
-      toast.success("Application submitted!");
+      queryClient.invalidateQueries({ queryKey: ["public-project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["item-invite-card"] });
+      if (result?.status === "accepted") {
+        const chatId = result.chatId;
+        toast.success("You're on the project", {
+          description: chatId ? "You're in the project chat now." : undefined,
+          action: chatId ? { label: "Open chat", onClick: () => navigate(messageHref(chatId)) } : undefined,
+        });
+      } else {
+        toast.success("Application submitted!");
+      }
       setSelectedRoleId(null);
       setApplicationMessage("");
     },
@@ -186,18 +189,10 @@ export default function PublicProjectPage() {
       const { error } = await supabase.from("guest_role_applications").insert(application);
       if (error) throw error;
 
-      // Notify via edge function (fire-and-forget, don't block success)
-      const roleName = project?.roles?.find((r) => r.id === roleId)?.role_name || "Unknown Role";
       supabase.functions.invoke("notify-guest-application", {
         body: {
           project_id: projectId,
-          project_title: project?.title,
-          role_name: roleName,
-          applicant_name: guestName.trim(),
           applicant_email: guestEmail.trim(),
-          project_creator_id: project?.creator_id,
-          portfolio_link: guestPortfolio.trim() || null,
-          message: guestMessage.trim() || null,
         },
       }).catch(() => {
         // Guest notification is best-effort.
@@ -240,6 +235,13 @@ export default function PublicProjectPage() {
     setSelectedRoleId(selectedRoleId === roleId ? null : roleId);
   };
 
+  // Open calls: Apply picks the call's role in the form below.
+  const pickRole = useCallback((roleId: string) => {
+    setSelectedRoleId(roleId);
+    scrollToRoles();
+  }, []);
+  useRoleFromLink(project?.roles, setSelectedRoleId, !user || user.id === project?.creator_id);
+
   const handleSubmitApplication = () => {
     if (!selectedRoleId) return;
     if (user) {
@@ -259,9 +261,17 @@ export default function PublicProjectPage() {
 
   const isPending = applyMutation.isPending || guestApplyMutation.isPending;
 
+  const hasRoles = Boolean(project?.roles?.length);
+  useEffect(() => {
+    if (!inviteId || !hasRoles) return;
+    const frame = requestAnimationFrame(() => document.getElementById("roles")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    return () => cancelAnimationFrame(frame);
+  }, [inviteId, hasRoles]);
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background">
+        <div className="px-4 pt-4"><BackButton label="Back" fallback="/projects" /></div>
         <div className="w-full max-w-lg mx-auto px-4 space-y-4">
           <Skeleton className="h-48 w-full rounded-2xl" />
           <Skeleton className="h-8 w-3/4" />
@@ -278,7 +288,8 @@ export default function PublicProjectPage() {
         <div className="text-center px-6">
           <Target className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-2xl font-display font-bold mb-2">Project Not Found</h1>
-          <p className="text-muted-foreground">This project doesn't exist or has been removed.</p>
+          <p className="text-muted-foreground">This project isn't available.</p>
+          <BackButton showLabel label="Back" fallback="/projects" className="mt-4" />
         </div>
       </div>
     );
@@ -294,7 +305,10 @@ export default function PublicProjectPage() {
     new Intl.NumberFormat("en-US", { style: "currency", currency: project.currency || "USD", minimumFractionDigits: 0 }).format(amount);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background">
+      <div className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-20">
+        <BackButton label="Back" fallback="/projects" className="bg-background/70 backdrop-blur" />
+      </div>
       {/* Hero */}
       <div className="relative">
         {project.cover_image_url ? (
@@ -390,9 +404,9 @@ export default function PublicProjectPage() {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4 text-primary shrink-0" />
                   <span>
-                    {project.timeline_start && format(new Date(project.timeline_start), "MMM d, yyyy")}
+                    {project.timeline_start && format(parseCalendarDate(project.timeline_start), "MMM d, yyyy")}
                     {project.timeline_start && project.timeline_end && " – "}
-                    {project.timeline_end && format(new Date(project.timeline_end), "MMM d, yyyy")}
+                    {project.timeline_end && format(parseCalendarDate(project.timeline_end), "MMM d, yyyy")}
                   </span>
                 </div>
               )}
@@ -428,17 +442,26 @@ export default function PublicProjectPage() {
           </Card>
         </motion.div>
 
+        {user && projectId && project.status === "completed" && <ProjectWrapUp projectId={projectId} projectTitle={project.title} />}
+        {user && projectId && <ProjectOpenCalls projectId={projectId} roles={project.roles || []} isOwner={isCreator} onApply={pickRole} />}
+
         {/* Apply for Roles Card */}
         {project.roles && project.roles.length > 0 && !isCreator && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card className="border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
+            <Card id="roles" className="scroll-mt-16 border-border/50 shadow-lg bg-card/95 backdrop-blur-md">
               <CardContent className="p-5 space-y-4">
                 <h3 className="text-lg font-display font-semibold flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" /> Apply for a Role
+                  <Users className="h-5 w-5 text-primary" /> {inviteId ? "Pick your role" : "Apply for a Role"}
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Select a role below and submit your application.
-                </p>
+                {inviteId ? (
+                  <p data-testid="invite-role-banner" className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm">
+                    You're invited. Pick the role you want to join as.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Select a role below and submit your application.
+                  </p>
+                )}
 
                 <div className="space-y-2">
                   {project.roles.map((role) => {
@@ -475,7 +498,7 @@ export default function PublicProjectPage() {
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-primary font-semibold text-sm">{formatCurrency(role.payout_amount)}</span>
+                              <span className="text-primary font-semibold text-sm">{formatRoleCompensation(Number(role.payout_amount), Number(role.credit_amount ?? 0))}</span>
                               {applied && (
                                 <Badge className={cn("text-[10px]",
                                   appStatus === 'accepted' ? "bg-emerald-500/20 text-emerald-400" :
@@ -569,7 +592,7 @@ export default function PublicProjectPage() {
                                   className="gap-1.5"
                                 >
                                   <Send className="h-3.5 w-3.5" />
-                                  {isPending ? "Submitting..." : "Submit Application"}
+                                  {isPending ? "Submitting..." : inviteId ? "Choose this role" : "Submit Application"}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -599,7 +622,7 @@ export default function PublicProjectPage() {
         )}
 
         {/* Action buttons */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex gap-2">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
           <Button
             variant="outline"
             className="flex-1 gap-2"

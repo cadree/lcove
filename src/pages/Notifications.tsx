@@ -10,14 +10,15 @@ import { Button } from '@/components/ui/button';
 const Notifications: React.FC = () => {
   return (
     <PageLayout showNotificationBell={false}>
-      <div className="h-full flex flex-col px-4 pt-6">
+      <div className="flex h-full min-w-0 flex-col px-4 pt-6">
         <PageHeader
           title="Notifications"
-          icon={<Bell className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+          icon={<Bell className="w-5 h-5" />}
+          tile="rose"
           actions={
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" aria-label="Notification settings">
                   <Settings className="h-5 w-5" />
                 </Button>
               </SheetTrigger>

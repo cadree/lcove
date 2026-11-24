@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
+import { BackButton } from "@/components/navigation/BackButton";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Loader2, Download, Check, PenTool, FileText, ArrowLeft } from "lucide-react";
+import { Loader2, Download, Check, PenTool, FileText } from "lucide-react";
 import { format } from "date-fns";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -90,7 +91,6 @@ export default function SignContract() {
   const { contractId } = useParams();
   const [searchParams] = useSearchParams();
   const signingToken = searchParams.get("token");
-  const navigate = useNavigate();
   const [signatureName, setSignatureName] = useState("");
   const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -312,8 +312,11 @@ export default function SignContract() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="min-h-screen bg-background">
+        <div className="px-4 pt-4"><BackButton label="Back" fallback="/projects" /></div>
+        <div className="flex min-h-[70vh] items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
       </div>
     );
   }
@@ -324,6 +327,7 @@ export default function SignContract() {
         <FileText className="w-16 h-16 text-muted-foreground" />
         <h1 className="text-2xl font-bold">Contract Not Found</h1>
         <p className="text-muted-foreground">This contract may have been deleted or the link is invalid.</p>
+        <BackButton showLabel label="Back" fallback="/projects" />
       </div>
     );
   }
@@ -335,10 +339,7 @@ export default function SignContract() {
       <div className="max-w-4xl mx-auto">
         {/* Header Actions */}
         <div className="flex items-center justify-between mb-6">
-          <Button variant="ghost" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
+          <BackButton showLabel label="Back" fallback="/projects" />
           <Button 
             onClick={generatePDF} 
             disabled={isGeneratingPdf}

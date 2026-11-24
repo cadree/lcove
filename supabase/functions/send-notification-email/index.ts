@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { escapeHtml, noticeForUser } from "../_shared/notification-auth.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const EMAIL_FROM = "ETHER <notifications@etherbylcove.com>";
@@ -31,6 +33,7 @@ const getEmailTemplate = (type: string, title: string, body: string) => {
     like: "#E91E63",
     comment: "#2196F3",
     project_invite: "#4CAF50",
+    item_invite: "#4CAF50",
     event_reminder: "#FF9800",
     live_stream: "#F44336",
   };
@@ -55,10 +58,10 @@ const getEmailTemplate = (type: string, title: string, body: string) => {
                       <span style="color: white; font-size: 24px;">✦</span>
                     </div>
                     <h1 style="color: #ffffff; font-size: 24px; margin: 0 0 16px; font-weight: 600;">
-                      ${title}
+                      ${escapeHtml(title)}
                     </h1>
                     <p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin: 0 0 30px;">
-                      ${body}
+                      ${escapeHtml(body)}
                     </p>
                     <a href="https://etherbylcove.com/notifications" 
                        style="display: inline-block; background: ${color}; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
@@ -94,15 +97,43 @@ serve(async (req) => {
   if (denied) return denied;
 
   try {
-    // Validate sender email before processing
-    validateSenderEmail(EMAIL_FROM);
-    
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { user_id, notification_type, title, body, data }: NotificationEmailRequest = await req.json();
+    const requestBody: NotificationEmailRequest = await req.json();
+    const { user_id, notification_type } = requestBody;
+    let { title, body, data } = requestBody;
+
+    const role = requestRole(req);
+    if (role !== "service_role") {
+      const callerId = await getBearerUser(req.headers.get("Authorization"), supabaseClient);
+      const notice = await noticeForUser(supabaseClient, {
+        callerId,
+        recipientId: user_id,
+        notificationType: notification_type,
+        data,
+      });
+      if (!notice.ok) {
+        return new Response(JSON.stringify({ error: notice.error }), {
+          status: notice.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      title = notice.title;
+      body = notice.body;
+      data = notice.data;
+    }
+
+    if (!user_id || !title) {
+      return new Response(JSON.stringify({ error: "user_id and title are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    validateSenderEmail(EMAIL_FROM);
 
     console.log("Sending notification email for user:", user_id, "type:", notification_type);
 
@@ -139,6 +170,7 @@ serve(async (req) => {
       like: "likes_enabled",
       comment: "comments_enabled",
       project_invite: "project_invites_enabled",
+        item_invite: "project_invites_enabled",
       event_reminder: "event_reminders_enabled",
       live_stream: "live_streams_enabled",
       admin: "admin_enabled",
@@ -190,7 +222,7 @@ serve(async (req) => {
     console.error("Error sending notification email:", errorMessage);
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: httpStatusForError(error), headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

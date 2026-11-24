@@ -1,5 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
+import { parseCalendarDate } from '@/lib/calendarDate';
 import { BarChart3, Calendar, Users, MapPin, Wrench, Package, Download, FileText, Eye, Clock } from 'lucide-react';
 import { Project } from '@/hooks/useProjects';
 import { useProjectAttachments } from '@/hooks/useProjectAttachments';
@@ -45,8 +46,8 @@ export const ClientDashboardView: React.FC<ClientDashboardViewProps> = ({ projec
             event={{
               title: project.title,
               description: project.description,
-              startDate: new Date(project.timeline_start),
-              endDate: project.timeline_end ? new Date(project.timeline_end) : null,
+              startDate: parseCalendarDate(project.timeline_start),
+              endDate: project.timeline_end ? parseCalendarDate(project.timeline_end) : null,
               location: project.venue,
             }}
             variant="compact"
@@ -97,9 +98,9 @@ export const ClientDashboardView: React.FC<ClientDashboardViewProps> = ({ projec
           <Calendar className="h-4 w-4 text-muted-foreground" />
           <div>
             <span className="font-medium">Timeline: </span>
-            {project.timeline_start && format(new Date(project.timeline_start), 'MMM d, yyyy')}
+            {project.timeline_start && format(parseCalendarDate(project.timeline_start), 'MMM d, yyyy')}
             {project.timeline_start && project.timeline_end && ' → '}
-            {project.timeline_end && format(new Date(project.timeline_end), 'MMM d, yyyy')}
+            {project.timeline_end && format(parseCalendarDate(project.timeline_end), 'MMM d, yyyy')}
           </div>
         </div>
       )}

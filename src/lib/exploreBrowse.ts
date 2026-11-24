@@ -1,0 +1,61 @@
+export interface BrowseReel {
+  id: string;
+  userId: string;
+  name: string;
+  mediaUrl: string;
+  /** For the tile's author chip and caption line. */
+  avatarUrl?: string | null;
+  caption?: string | null;
+  postId?: string;
+}
+
+interface PostLike {
+  id: string;
+  user_id: string;
+  media_url: string | null;
+  media_type: string | null;
+  post_type?: string | null;
+  content?: string | null;
+  profile?: { display_name?: string | null; avatar_url?: string | null } | null;
+  upload_job_id?: string | null;
+}
+
+/** Video posts only. Stories are 24-hour moments and never appear as reels. */
+export function collectReels(posts: PostLike[]): BrowseReel[] {
+  const seen = new Set<string>();
+  return posts
+    .filter((post) => post.media_type === "video" && post.media_url && !post.upload_job_id)
+    // A post can arrive twice (refetch plus realtime). Show each reel once.
+    .filter((post) => {
+      if (seen.has(post.id)) return false;
+      seen.add(post.id);
+      return true;
+    })
+    .map((post) => ({
+      id: `post-${post.id}`,
+      userId: post.user_id,
+      name: post.profile?.display_name || "Member",
+      mediaUrl: post.media_url as string,
+      avatarUrl: post.profile?.avatar_url ?? null,
+      caption: post.content?.trim() || null,
+      postId: post.id,
+    }));
+}
+
+export function browsePosts<T extends { post_type?: string | null }>(posts: T[], lane: "posts" | "portfolios") {
+  return posts.filter((post) =>
+    lane === "portfolios" ? post.post_type === "portfolio" : post.post_type !== "portfolio",
+  );
+}
+
+export function matchesBrowseQuery(name: string | null | undefined, content: string | null | undefined, query: string) {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  return (name || "").toLowerCase().includes(needle) || (content || "").toLowerCase().includes(needle);
+}
+
+/** The next page of the list. It stops at the end; nothing repeats. */
+export function growVisibleCount(current: number, total: number, pageSize: number) {
+  if (total <= 0) return 0;
+  return Math.min(total, current + pageSize);
+}

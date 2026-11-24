@@ -1,65 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
-import { motion } from 'framer-motion';
-import lcBearLogo from '@/assets/lc-bear-logo.png';
+import { isKnownPath, isPublicPath } from "@/lib/appRoutes";
+import { SignUpPrompt } from "@/components/auth/SignUpPrompt";
+import { accessPath } from "@/lib/accessPath";
+import { FIRST_RUN_PATH, welcomeStep, type WelcomeStatus } from "@/lib/firstRun";
+import { callRpc } from "@/lib/rpc";
+import { EVENT_RETURN_KEY, eventReturnPath, rememberEventReturn } from "../../../functions/_shared/eventShare.js";
 
 interface AccessGateProps {
   children: React.ReactNode;
 }
 
-// Exact paths a logged-out visitor can open.
-const PUBLIC_EXACT = new Set([
-  '/',
-  '/landing',
-  '/auth',
-  '/onboarding',
-  '/locked',
-  '/admin/onboarding',
-  '/denied',
-  '/admin',
-  '/fund',
-  '/unsubscribe',
-  '/privacy',
-  '/terms',
-  '/guidelines',
-  '/community',
-  '/nuance',
-]);
-
 // Signed-in people leave the public landing for the feed.
 const LANDING_ROUTES = ['/', '/landing'];
-
-function isPublicPath(pathname: string) {
-  if (PUBLIC_EXACT.has(pathname)) return true;
-  return (
-    pathname.startsWith('/admin/onboarding') ||
-    pathname.startsWith('/event/') ||
-    pathname.startsWith('/project/') ||
-    pathname.startsWith('/book/') ||
-    pathname.startsWith('/sign-contract') ||
-    pathname.startsWith('/client/')
-  );
-}
 
 const AccessGate = ({ children }: AccessGateProps) => {
   const { user, loading: authLoading } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
   const location = useLocation();
-  const [showWelcome, setShowWelcome] = useState(false);
-  const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
+  const knownRoute = isKnownPath(location.pathname);
   const isPublicRoute = isPublicPath(location.pathname);
   const isLandingRoute = LANDING_ROUTES.includes(location.pathname);
+  const legacyStreamId = location.pathname === "/live"
+    ? new URLSearchParams(location.search).get("stream")
+    : null;
 
   useEffect(() => {
+    if (!knownRoute) return;
     // Wait for auth to load first
     if (authLoading) return;
 
     if (user && isLandingRoute) {
       navigate('/feed', { replace: true });
+      return;
+    }
+
+    if (!user && legacyStreamId) {
+      navigate(`/live/${legacyStreamId}`, { replace: true });
       return;
     }
 
@@ -69,11 +50,8 @@ const AccessGate = ({ children }: AccessGateProps) => {
     // Wait for profile to load for authenticated users
     if (profileLoading) return;
 
-    // If not logged in and not on public route, redirect to auth
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
+    // Community routes render a sign-up prompt instead of the page.
+    if (!user) return;
 
     // If profile exists, check access
     if (profile) {
@@ -82,8 +60,16 @@ const AccessGate = ({ children }: AccessGateProps) => {
       
       // If onboarding not completed and no session flag, force onboarding
       if (!profile.onboarding_completed && !justCompletedOnboarding) {
+        rememberEventReturn(`${location.pathname}${location.search}`);
         navigate('/onboarding');
         return;
+      }
+
+      if (profile.onboarding_completed) {
+        const stored = eventReturnPath(sessionStorage.getItem(EVENT_RETURN_KEY));
+        if (stored && stored.split("#")[0] === `${location.pathname}${location.search}`) {
+          sessionStorage.removeItem(EVENT_RETURN_KEY);
+        }
       }
       
       // Clear the session flag only after profile shows onboarding is complete
@@ -91,98 +77,80 @@ const AccessGate = ({ children }: AccessGateProps) => {
         sessionStorage.removeItem('onboarding_just_completed');
       }
 
-      // Banned accounts stay on the locked screen. Finishing onboarding
-      // never denies access, and existing denied rows are opened by migration.
-      const accessStatus = profile.access_status || 'pending';
-      
-      if (accessStatus === 'banned') {
-        if (location.pathname !== '/locked') {
-          navigate('/locked');
-        }
+      const next = accessPath(
+        { onboarding_completed: profile.onboarding_completed, access_status: profile.access_status },
+        `${location.pathname}${location.search}`,
+      );
+      if (next === '/pending' && location.pathname !== '/pending') {
+        navigate('/pending', { replace: true });
+        return;
+      }
+      if (next === '/denied' && location.pathname !== '/denied') {
+        navigate('/denied', { replace: true });
+        return;
+      }
+      if (next === '/locked' && location.pathname !== '/locked') {
+        navigate('/locked', { replace: true });
+        return;
+      }
+      if (location.pathname === '/pending' && next !== '/pending') {
+        navigate(next === '/feed' ? FIRST_RUN_PATH : next, { replace: true });
+        return;
+      }
+      if ((location.pathname === '/locked' || location.pathname === '/denied') && next !== location.pathname) {
+        navigate(profile.onboarding_completed ? '/feed' : '/onboarding', { replace: true });
         return;
       }
 
-      if (location.pathname === '/locked') {
-        navigate(profile.onboarding_completed ? '/feed' : '/onboarding');
-        return;
-      }
-
-      // If access is active, show welcome popup once
-      if (accessStatus === 'active' && !hasSeenWelcome) {
-        const welcomeKey = `welcome_shown_${user.id}`;
-        const alreadyShown = localStorage.getItem(welcomeKey);
-        if (!alreadyShown) {
-          setShowWelcome(true);
-          localStorage.setItem(welcomeKey, 'true');
-          setHasSeenWelcome(true);
-        }
-      }
     }
-  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, navigate, location.pathname, hasSeenWelcome]);
+  }, [user, profile, authLoading, profileLoading, isPublicRoute, isLandingRoute, knownRoute, legacyStreamId, navigate, location.pathname, location.search]);
 
-  // Show loading state while checking auth/profile
-  if (!isPublicRoute && (authLoading || profileLoading)) {
+  // An approved creative registers the card once. Without a card they are sent
+  // to /welcome; with one, the gate finishes the welcome and never redirects,
+  // so a missed "Continue to Explore" tap cannot trap them. Legacy members
+  // without an acceptance event are not interrupted.
+  useEffect(() => {
+    if (!user?.id || authLoading || profileLoading || !profile?.onboarding_completed || profile.access_status !== 'active') return;
+    if (location.pathname === FIRST_RUN_PATH) return;
+    let cancelled = false;
+    callRpc<WelcomeStatus>('get_my_familcy_welcome_status')
+      .then((status) => {
+        if (cancelled) return;
+        const step = welcomeStep(status, location.pathname, location.search);
+        if (step.kind === 'redirect') navigate(step.to, { replace: true });
+        if (step.kind === 'finish') void callRpc<void>('complete_my_familcy_welcome').catch(() => undefined);
+      })
+      .catch(() => { /* A temporary lookup failure must not erase approval. */ });
+    return () => { cancelled = true; };
+  }, [user?.id, authLoading, profileLoading, profile?.onboarding_completed, profile?.access_status, location.pathname, location.search, navigate]);
+
+  if (!knownRoute) {
+    return <>{children}</>;
+  }
+
+  if (!user && legacyStreamId) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full"
-        />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary motion-reduce:animate-none" />
       </div>
     );
   }
 
-  return (
-    <>
-      {children}
-      
-      {/* Welcome Home Popup */}
-      {showWelcome && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
-          onClick={() => setShowWelcome(false)}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-            className="bg-card border border-border rounded-2xl p-8 md:p-12 text-center max-w-md mx-4 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <motion.img
-              src={lcBearLogo}
-              alt="Ether"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
-              className="w-24 h-24 mx-auto mb-6 object-contain"
-            />
-            
-            <h2 className="font-display text-3xl md:text-4xl text-foreground mb-4">
-              Welcome home Familcy
-            </h2>
-            
-            <p className="text-muted-foreground mb-8">
-              You've been accepted into the community. This is where you belong.
-            </p>
-            
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setShowWelcome(false)}
-              className="w-full py-3 px-6 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 transition-colors"
-            >
-              Enter
-            </motion.button>
-          </motion.div>
-        </motion.div>
-      )}
-    </>
-  );
+  // Community routes stay behind a sign-up prompt. The profile request must
+  // not hold a public page: onboarding and banned redirects run once that row arrives.
+  if (!isPublicRoute && !authLoading && !user) {
+    return <SignUpPrompt />;
+  }
+
+  if (!isPublicRoute && (authLoading || !user)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary motion-reduce:animate-none" />
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 };
 
 export default AccessGate;

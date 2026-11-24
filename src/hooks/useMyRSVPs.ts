@@ -1,7 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "sonner";
 
 export interface MyRSVP {
   id: string;
@@ -45,23 +44,5 @@ export function useMyRSVPs() {
       return (data || []).filter((r) => r.event) as unknown as MyRSVP[];
     },
     enabled: !!user,
-  });
-}
-
-export function useCancelRSVP() {
-  const qc = useQueryClient();
-  const { user } = useAuth();
-
-  return useMutation({
-    mutationFn: async (rsvpId: string) => {
-      if (!user) throw new Error('Not logged in');
-      const { error } = await supabase.from('event_rsvps').delete().eq('id', rsvpId).eq('user_id', user.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['my-rsvps'] });
-      toast.success('RSVP cancelled');
-    },
-    onError: (e: Error) => toast.error(e.message || 'Failed to cancel'),
   });
 }

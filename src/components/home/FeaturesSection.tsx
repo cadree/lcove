@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
+import { revealMotion } from "@/lib/reveal";
 import { Link } from "react-router-dom";
-import { Users, FolderKanban, Calendar, Coins, Store, Music, Heart, ArrowRight, Film, Handshake, Radio, Megaphone } from "lucide-react";
+import { Users, FolderKanban, Calendar, Coins, Store, Music, Heart, ArrowRight, Handshake, Radio, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useFundStats } from "@/hooks/useFundStats";
 
@@ -18,12 +19,6 @@ const features = [
     link: "/projects",
   },
   {
-    icon: Film,
-    title: "Creator Networks",
-    description: "Launch your own streaming network. Share films, series, and content with subscribers.",
-    link: "/cinema",
-  },
-  {
     icon: Calendar,
     title: "Community Calendar",
     description: "Discover local events, workshops, and gatherings. City-first, always.",
@@ -38,7 +33,7 @@ const features = [
   {
     icon: Handshake,
     title: "Partners",
-    description: "Studios, venues, and businesses offering exclusive benefits to LC members.",
+    description: "Studios, venues, and businesses offering exclusive benefits to Ether members.",
     link: "/partners",
   },
   {
@@ -76,10 +71,7 @@ const FeaturesSection = () => {
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          {...revealMotion({ y: 20, duration: 0.6 })}
           className="text-center mb-16"
         >
           <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-medium text-foreground mb-4">
@@ -95,10 +87,7 @@ const FeaturesSection = () => {
           {features.map((feature, index) => (
             <motion.div
               key={feature.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
+              {...revealMotion({ y: 20, delay: index * 0.1 })}
             >
               <Link to={feature.link} className="block h-full">
                 <div className="glass-strong rounded-2xl p-6 hover:bg-accent/30 transition-all duration-300 group h-full cursor-pointer">
@@ -119,10 +108,7 @@ const FeaturesSection = () => {
 
         {/* Community Fund Highlight Card */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.3 }}
+          {...revealMotion({ y: 30, duration: 0.6, delay: 0.3 })}
           className="mt-12"
         >
           <Link to="/fund" className="block">
@@ -136,8 +122,7 @@ const FeaturesSection = () => {
                     Community Fund
                   </h3>
                   <p className="text-muted-foreground max-w-xl">
-                    100% transparent. Every dollar, every decision, fully visible. See how member contributions 
-                    fund grants, events, and creative opportunities.
+                    100% transparent. Every dollar, every decision, fully visible. See what ETHER collects from support and memberships, and how it is used.
                   </p>
                 </div>
                 <Button variant="outline" className="group-hover:bg-primary group-hover:text-primary-foreground transition-all">

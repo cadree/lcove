@@ -71,7 +71,7 @@ export function ProfileFriendsSection() {
     <div className="flex items-center justify-between mb-3">
       <h3 className="font-medium text-foreground flex items-center gap-2">
         <Users className="w-4 h-4" />
-        Friends
+        Top Friends
         {typeof count === "number" ? <span className="text-xs text-muted-foreground">({count})</span> : null}
       </h3>
     </div>

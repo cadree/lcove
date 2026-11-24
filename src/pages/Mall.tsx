@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { SquircleIcon } from '@/components/world/SquircleIcon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
@@ -41,6 +42,25 @@ interface StoreWithProfile {
     city: string | null;
   };
   item_count?: number;
+}
+
+function StoreMark({ store, size }: { store: StoreWithProfile; size: number }) {
+  if (store.logo_url) {
+    return (
+      <img
+        src={store.logo_url}
+        alt=""
+        className="mark-cutout object-contain"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return (
+    <Avatar style={{ width: size, height: size }}>
+      <AvatarImage src={store.profile?.avatar_url || undefined} />
+      <AvatarFallback className="font-body text-xs">{store.name.charAt(0)}</AvatarFallback>
+    </Avatar>
+  );
 }
 
 interface StoreCategory {
@@ -149,13 +169,13 @@ const Mall = () => {
     <PageLayout>
       <div className="min-h-screen bg-background">
         {/* Hero Header */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-accent/10 border-b border-border">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,hsl(var(--primary)/0.1),transparent_50%)]" />
-          <div className="container mx-auto px-4 py-8 relative">
+        <div className="relative border-b border-border">
+          <div className="container relative mx-auto px-4 py-8">
             <PageHeader
               title="Creative Mall"
               description="Browse products, services, and studio rentals from talented creators"
-              icon={<ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />}
+              icon={<ShoppingCart className="w-5 h-5" />}
+              tile="gold"
               className="mb-6"
             />
             
@@ -176,7 +196,7 @@ const Mall = () => {
           {/* Quick Category Filters */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-foreground">Browse by Type</h2>
+              <h2 className="ether-title text-[15px] text-foreground">Browse by Type</h2>
               <Button
                 variant="ghost"
                 size="sm"
@@ -212,9 +232,9 @@ const Mall = () => {
           {/* Featured Creators */}
           {featuredStores.length > 0 && !searchQuery && (
             <section className="mb-12">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-semibold text-foreground">Featured Creators</h2>
+              <div className="mb-4 flex items-center gap-2">
+                <SquircleIcon icon={TrendingUp} fill="rose" size={28} />
+                <h2 className="ether-title text-xl text-foreground">Featured Creators</h2>
               </div>
               <ScrollArea className="w-full">
                 <div className="flex gap-4 pb-4">
@@ -224,21 +244,16 @@ const Mall = () => {
                       className="flex-shrink-0 w-72 cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] bg-card/80 backdrop-blur-sm border-border/50 overflow-hidden group"
                       onClick={() => navigate(`/store?store=${store.id}`)}
                     >
-                      <div className="h-24 bg-gradient-to-br from-primary/20 to-accent/20 relative overflow-hidden">
+                      <div className="relative h-24 overflow-hidden bg-[hsl(var(--panel-3))]">
                         {store.cover_image_url && (
                           <img
                             src={store.cover_image_url}
                             alt=""
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            className="h-full w-full object-cover transition-transform group-hover:scale-105"
                           />
                         )}
-                        <div className="absolute -bottom-6 left-4">
-                          <Avatar className="w-12 h-12 border-2 border-background">
-                            <AvatarImage src={store.logo_url || store.profile?.avatar_url || undefined} />
-                            <AvatarFallback className="bg-primary text-primary-foreground">
-                              {store.name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
+                        <div className="absolute -bottom-4 left-4">
+                          <StoreMark store={store} size={48} />
                         </div>
                       </div>
                       <CardContent className="pt-8 pb-4">
@@ -265,7 +280,7 @@ const Mall = () => {
 
           {/* Category Grid */}
           <section className="mb-12">
-            <h2 className="text-xl font-semibold text-foreground mb-4">Browse Categories</h2>
+            <h2 className="ether-title mb-4 text-xl text-foreground">Browse Categories</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {Object.entries(categoriesByType).map(([type, cats]) => {
                 const Icon = categoryIcons[type as keyof typeof categoryIcons];
@@ -287,7 +302,7 @@ const Mall = () => {
           {/* All Stores */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="ether-title text-xl text-foreground">
                 All Stores
                 {filteredStores.length > 0 && (
                   <span className="text-muted-foreground font-normal ml-2">
@@ -341,7 +356,7 @@ const Mall = () => {
                     className="cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] bg-card/80 backdrop-blur-sm border-border/50 overflow-hidden group"
                     onClick={() => navigate(`/store?store=${store.id}`)}
                   >
-                    <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 relative overflow-hidden">
+                    <div className="relative aspect-[4/3] overflow-hidden bg-[hsl(var(--panel-3))]">
                       {store.cover_image_url ? (
                         <img
                           src={store.cover_image_url}
@@ -356,12 +371,7 @@ const Mall = () => {
                     </div>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3 mb-2">
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={store.logo_url || store.profile?.avatar_url || undefined} />
-                          <AvatarFallback className="text-xs">
-                            {store.name.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <StoreMark store={store} size={32} />
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-foreground truncate text-sm group-hover:text-primary transition-colors">
                             {store.name}
@@ -389,10 +399,7 @@ const Mall = () => {
                     onClick={() => navigate(`/store?store=${store.id}`)}
                   >
                     <CardContent className="p-4 flex items-center gap-4">
-                      <Avatar className="w-12 h-12 flex-shrink-0">
-                        <AvatarImage src={store.logo_url || store.profile?.avatar_url || undefined} />
-                        <AvatarFallback>{store.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
+                      <StoreMark store={store} size={48} />
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-foreground truncate hover:text-primary transition-colors">
                           {store.name}

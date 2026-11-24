@@ -80,9 +80,17 @@ These numbers are what the code charges and what the screens say. They live in `
 
 - Store sales through Ether checkout: **10%** of the item price (`STORE_PLATFORM_FEE_PERCENT`). The seller receives 90%. The seller-entered shipping amount and the seller-entered tax line are added in full and are not part of the 10%. The seller sees this before they publish an item. This is not the community-fund fee.
 - Shopify products linked from a public `/products.json` list are not sold on Ether. The buy button goes to `https://{shop}/products/{handle}`. Ether does not take a fee on those sales.
-- Event tickets: **no platform fee** (`EVENT_PLATFORM_FEE_PERCENT` is 0). Checkout does not send `application_fee_amount`. The Finance tab and payout settings say that, and they do not show a fee line. When the host has Connect payouts on, the charge is transferred without a platform cut. When Connect is off, the platform still receives the charge until payouts are set up. That is not a fee.
+- Event tickets: **no platform fee** (`EVENT_PLATFORM_FEE_PERCENT` is 0). Checkout does not send `application_fee_amount`. The Finance tab and payout settings say that, and they do not show a fee line. The charge is a destination charge to the host's connected account. When the host's account can't accept charges yet, checkout is refused with `needs_connect` and the buyer sees that the seller hasn't finished payment setup.
 - Network subscriptions: **10%** (`COMMUNITY_FUND_FEE_PERCENT`), earmarked for the community fund. When the creator has Connect payouts on, Checkout sends `application_fee_percent` of 10. The creator receives 90%. The fee is inserted into `community_fund_fees` when the payment completes, and `membership_fund_snapshot` adds that dollar amount to the fund total.
 - Studio bookings on Ether checkout: **10%** of the booking price (`COMMUNITY_FUND_FEE_PERCENT`), earmarked for the community fund. Checkout sends `application_fee_amount`. The fee row is written on `checkout.session.completed`, not when the Checkout Session is created. A credit booking records the same percentage as `credits_amount` when the credit payment completes. Credit amounts are not added to the dollar fund total.
+
+## Card sales need a connected account
+
+Store items, event tickets, studio bookings, network subscriptions, music, artist subscriptions, invoices, project payments and live-stream card gifts are destination charges to the creator's connected Stripe account. When that account can't accept charges, the checkout function returns `{ needs_connect: true, error }` (see `supabase/functions/_shared/seller-payment-setup.mjs`) and no order is written. ETHER never collects a creator sale on its own account to pay out later.
+
+## Credit cash-out is off
+
+Credits (LC) can't be bought with money. `process-payout` refuses every request while `CREDIT_CASH_OUT_ENABLED` in `supabase/functions/_shared/payout-request.mjs` is `false`, before any Stripe call. Wallet shows that cash-out is off instead of Request Payout.
 
 ## Shipping and tax
 
@@ -92,4 +100,4 @@ Sellers arrange their own shipping. Checkout adds the amount the seller entered 
 
 The iOS app does not open Stripe for memberships, exclusive music, or store card checkout. Physical goods can show a text link to the Ether website. Credits already on the account can still be spent.
 
-Donations stay visible. `IOS_DONATIONS_ENABLED` in `src/lib/platform.ts` is `true`. Set it to `false` to hide the donate buttons if App Review rejects them. Membership and music stay hidden either way. See `docs/ios-release.md`.
+Donations and membership checkout stay off on iOS unless StoreKit reports the USA storefront, in which case they open Safari. `IOS_DONATIONS_ENABLED` stays `false`. Exclusive music, paid films, and live card gifts stay hidden on every storefront. See `docs/ios-release.md`.

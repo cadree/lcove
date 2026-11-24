@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
 import { Toaster as Sonner, toast } from "sonner";
 
@@ -6,7 +7,11 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
 
-  return (
+  // #root is its own stacking context (isolation: isolate), and sheets and dialogs
+  // portal to <body>. Inside #root no z-index could lift a toast over an open
+  // sheet, so "Link copied" was drawn underneath it. The toaster lives on <body> too.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
@@ -20,7 +25,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
         },
       }}
       {...props}
-    />
+    />,
+    document.body,
   );
 };
 

@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireUserOrService } from "../_shared/require-caller.ts";
+import { getBearerUser, requestRole, requireUserOrService } from "../_shared/require-caller.ts";
+import { authorizeContentSubmission, escapeHtml } from "../_shared/notification-auth.mjs";
+import { httpStatusForError } from "../_shared/http-error.mjs";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
@@ -45,17 +47,17 @@ const getEmailTemplate = (networkName: string, submissionTitle: string, submitte
                       New Content Submission
                     </h1>
                     <p style="color: #a0a0a0; font-size: 14px; margin: 0 0 24px;">
-                      for ${networkName}
+                      for ${escapeHtml(networkName)}
                     </p>
                     <div style="background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 24px; text-align: left;">
                       <p style="color: #e85d8c; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px;">
-                        ${typeLabel}
+                        ${escapeHtml(typeLabel)}
                       </p>
                       <p style="color: #ffffff; font-size: 20px; font-weight: 600; margin: 0 0 8px;">
-                        ${submissionTitle}
+                        ${escapeHtml(submissionTitle)}
                       </p>
                       <p style="color: #888; font-size: 14px; margin: 0;">
-                        Submitted by ${submitterName}
+                        Submitted by ${escapeHtml(submitterName)}
                       </p>
                     </div>
                     <a href="https://etherbylcove.com/cinema" 
@@ -70,7 +72,7 @@ const getEmailTemplate = (networkName: string, submissionTitle: string, submitte
                       LC Cinema • ETHER Creative Collective
                     </p>
                     <p style="color: #555; font-size: 11px; margin: 8px 0 0;">
-                      You're receiving this because you own the "${networkName}" network.
+                      You're receiving this because you own the "${escapeHtml(networkName)}" network.
                     </p>
                   </td>
                 </tr>
@@ -134,23 +136,49 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { network_id, network_name, submission_title, submitter_name, content_type }: NotifySubmissionRequest = await req.json();
+    const body = await req.json() as Partial<NotifySubmissionRequest>;
+    const requestedNetworkId = typeof body.network_id === "string" ? body.network_id : "";
+    const role = requestRole(req);
+    const callerId = role === "service_role" ? null : await getBearerUser(req.headers.get("Authorization"), supabase);
 
-    console.log(`Notifying owner of network ${network_id} about new submission: ${submission_title}`);
+    const { data: network } = requestedNetworkId
+      ? await supabase.from("networks").select("id, owner_id, name").eq("id", requestedNetworkId).maybeSingle()
+      : { data: null };
 
-    // Get the network owner
-    const { data: network, error: networkError } = await supabase
-      .from("networks")
-      .select("owner_id")
-      .eq("id", network_id)
-      .single();
-
-    if (networkError || !network) {
-      console.error("Error fetching network:", networkError);
-      throw new Error("Network not found");
+    let submission: { network_id: string; submitter_id: string; title: string; content_type: string } | null = null;
+    let submitterName: string | null = null;
+    if (network && (callerId || role === "service_role")) {
+      let query = supabase
+        .from("content_submissions")
+        .select("network_id, submitter_id, title, content_type")
+        .eq("network_id", network.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (role !== "service_role" && callerId) query = query.eq("submitter_id", callerId);
+      const { data } = await query.maybeSingle();
+      submission = data;
+      if (data?.submitter_id) {
+        const { data: profile } = await supabase.from("profiles").select("display_name").eq("user_id", data.submitter_id).maybeSingle();
+        submitterName = profile?.display_name ?? null;
+      }
     }
 
-    const ownerId = network.owner_id;
+    const decision = authorizeContentSubmission({ callerId, role, submission, network, submitterName });
+    if (!decision.ok) {
+      return new Response(JSON.stringify({ error: decision.error }), {
+        status: decision.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const network_id = decision.networkId;
+    const network_name = decision.networkName;
+    const submission_title = decision.submissionTitle;
+    const submitter_name = decision.submitterName;
+    const content_type = decision.contentType;
+    const ownerId = decision.ownerId;
+
+    console.log(`Notifying owner of network ${network_id} about new submission: ${submission_title}`);
 
     // Get owner's notification preferences
     const { data: prefs } = await supabase
@@ -163,7 +191,7 @@ serve(async (req) => {
     const { data: profile } = await supabase
       .from("profiles")
       .select("display_name, phone")
-      .eq("id", ownerId)
+      .eq("user_id", ownerId)
       .single();
 
     // Get owner's email
@@ -251,7 +279,7 @@ serve(async (req) => {
     console.error("Error in notify-content-submission:", errorMessage);
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: httpStatusForError(error), headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
