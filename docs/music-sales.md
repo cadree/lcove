@@ -1,7 +1,16 @@
-# Locked music (paid tracks)
+# Uploaded music
 
-Artists upload a track with a price. Fans hear a 15-second preview and pay once
-to unlock the full file on every device they sign in on.
+Artists choose Free listening or Paid access when uploading from Files.
+Free tracks use `access_type = 'free'`, a zero price and downloads disabled.
+Signed-in listeners can play those published tracks in full without Stripe or a
+payout account. Existing zero-price subscriber tracks are not automatically free.
+Paid tracks retain the $0.50 minimum, previews and verified purchase unlocks.
+
+Downloads require `allow_downloads` and a completed, positive-value purchase of
+that specific track. Subscription listening does not grant downloads. The
+`download-music-track` function rechecks both before minting a one-minute link.
+Streaming delivers audio to the device; these controls do not prevent recording
+or extracting audio from a playback session.
 
 ## Where files live
 
@@ -36,3 +45,12 @@ The Stripe webhook endpoint must send these events:
 After the migration, run `scripts/move-legacy-locked-tracks.mjs` once. It
 defaults to a dry run; pass `--apply` to write. It moves full files that are
 still public into `music-private` and makes previews with ffmpeg.
+
+## Payout onboarding on iPhone
+
+`create-music-payout-account` uses trusted HTTPS return/retry URLs, never the
+native WebView origin. SITE_URL/APP_URL support a configured staging website.
+An expired Stripe link returns to the profile and creates a fresh link. Returning
+from onboarding refreshes Stripe status; a return query does not itself enable
+payouts. On iPhone, the existing Safari bridge opens `/payout-onboarding.html`, where
+the single-use Stripe URL is read from a fragment (not sent to the web server).

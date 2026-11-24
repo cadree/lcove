@@ -7,7 +7,7 @@ export const MAX_COVER_BYTES = 5 * 1024 * 1024;
 export const MIN_TRACK_PRICE_CENTS = 50;
 export const MAX_TRACK_PRICE_CENTS = 50000;
 export const LOCKED_AUDIO_DETAIL =
-  "Any audio file, up to 50MB. Fans hear a 15-second preview until they buy.";
+  "Any audio file, up to 50MB. Choose free listening or paid access.";
 
 /** "$4.99", "4.99", "5" → cents; anything else → null. */
 export function parsePriceCents(input: string): number | null {
@@ -34,6 +34,7 @@ export interface LockedUploadInput {
   isAudio: (file: { name: string; type: string }) => boolean;
   /** Subscriber-only tracks may leave the price empty. */
   hasSubscriptionRule?: boolean;
+  freeListening?: boolean;
 }
 
 export function lockedUploadProblems(input: LockedUploadInput): LockedUploadProblem[] {
@@ -50,7 +51,7 @@ export function lockedUploadProblems(input: LockedUploadInput): LockedUploadProb
   }
   const subscriberOnly = !!input.hasSubscriptionRule && !input.price.trim();
   const cents = parsePriceCents(input.price);
-  if (!subscriberOnly && (cents === null || cents < MIN_TRACK_PRICE_CENTS || cents > MAX_TRACK_PRICE_CENTS)) problems.push("price");
+  if (!input.freeListening && !subscriberOnly && (cents === null || cents < MIN_TRACK_PRICE_CENTS || cents > MAX_TRACK_PRICE_CENTS)) problems.push("price");
   return problems;
 }
 
@@ -101,4 +102,9 @@ export function summarizeSales(rows: SaleRow[]): Record<string, TrackSales> {
     }
   }
   return out;
+}
+
+/** A zero price alone may be a legacy subscriber track; free listening is explicit. */
+export function isFreeMusicTrack(track: { access_type?: string | null; price_cents?: number | null; is_published?: boolean }): boolean {
+  return track.access_type === "free" && track.price_cents === 0 && track.is_published === true;
 }

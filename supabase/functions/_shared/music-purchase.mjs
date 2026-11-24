@@ -15,7 +15,7 @@ export class MusicPurchaseError extends Error {
 
 /**
  * @param {object} input
- * @param {{ id: string, artist_user_id: string, price_cents?: number|null, is_published?: boolean }|null} input.track
+ * @param {{ id: string, artist_user_id: string, price_cents?: number|null, access_type?: string, is_published?: boolean }|null} input.track
  * @param {{ id: string, artist_user_id: string, track_id?: string|null, rule_type?: string, amount_cents?: number|null, is_active?: boolean }|null} input.rule
  * @param {string|null} input.requestedRuleId
  * @param {string} input.buyerId
@@ -26,6 +26,8 @@ export function resolveMusicPurchase({ track, rule, requestedRuleId, buyerId, al
   if (!track || track.is_published === false) throw new MusicPurchaseError("Track not found", 404);
   if (track.artist_user_id === buyerId) throw new MusicPurchaseError("You can't purchase your own track");
   if (alreadyPaid) throw new MusicPurchaseError("You already own this track. Refresh to play it.", 409);
+
+  if (track.access_type === "free") throw new MusicPurchaseError("This track is free to listen to in Ether.");
 
   let amountCents = Number(track.price_cents) || 0;
   let accessRuleId = null;

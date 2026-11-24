@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useRefreshMusicPayoutStatus } from "@/hooks/useMusicPayouts";
+import { useCreateMusicPayoutAccount, useRefreshMusicPayoutStatus } from "@/hooks/useMusicPayouts";
 
 interface VerifyResultRow {
   status?: string;
@@ -30,6 +30,9 @@ export function useMusicCheckoutReturn(isOwner: boolean) {
   const refreshPayoutStatus = useRefreshMusicPayoutStatus();
   const refreshPayoutsRef = useRef(refreshPayoutStatus.mutate);
   refreshPayoutsRef.current = refreshPayoutStatus.mutate;
+  const createPayout = useCreateMusicPayoutAccount();
+  const createPayoutRef = useRef(createPayout.mutate);
+  createPayoutRef.current = createPayout.mutate;
 
   // Refresh queries after returning from Stripe.
   // CRITICAL: never trust URL params alone to grant access. We MUST call the
@@ -91,9 +94,16 @@ export function useMusicCheckoutReturn(isOwner: boolean) {
       })();
       window.history.replaceState({}, "", window.location.pathname);
     } else if (musicPayouts === "success" && isOwner) {
-      toast.success("Payouts connected!");
-      refreshPayoutsRef.current();
       window.history.replaceState({}, "", window.location.pathname);
+      refreshPayoutsRef.current(undefined, { onSuccess: (status) => {
+        if (status.payout_enabled) toast.success("Payouts connected!");
+        else toast.info("Setup saved. Stripe may still need details or verification before payouts are ready.");
+      } });
+    } else if (musicPayouts === "refresh" && isOwner) {
+      // Stripe account links are single-use. An expired link must create a fresh
+      // one, not leave the artist at a dead end on their profile.
+      window.history.replaceState({}, "", window.location.pathname);
+      createPayoutRef.current();
     }
   }, [queryClient, isOwner]);
 }

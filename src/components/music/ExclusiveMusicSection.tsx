@@ -68,6 +68,7 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newPrice, setNewPrice] = useState("");
+  const [freeListening, setFreeListening] = useState(true);
   const [allowDownloads, setAllowDownloads] = useState(false);
   const [previewStart, setPreviewStart] = useState("0");
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -85,6 +86,17 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
       refreshPayoutsRef.current();
     }
   }, [isOwner, payoutStatus?.has_account, payoutStatus?.payout_enabled]);
+
+  useEffect(() => {
+    if (!isOwner || !payoutStatus?.has_account) return;
+    const refresh = () => { if (document.visibilityState === "visible") refreshPayoutsRef.current(); };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [isOwner, payoutStatus?.has_account]);
 
   const hasMonetizedContent =
     tracks.some((t) => (t.price_cents || 0) > 0) ||
@@ -106,6 +118,7 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
     setNewTitle("");
     setNewDescription("");
     setNewPrice("");
+    setFreeListening(true);
     setAllowDownloads(false);
     setPreviewStart("0");
     setAudioFile(null);
@@ -124,6 +137,7 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
       price: newPrice,
       isAudio: isAudioUpload,
       hasSubscriptionRule,
+      freeListening,
     });
     setUploadProblems(problems);
     if (problems.length > 0 || !audioFile) return;
@@ -136,8 +150,8 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
 
       // Preview first: if the browser can decode the file, fans get a real
       // 15-second clip. The full file is never used as the preview.
-      setUploadStep("Making the preview…");
-      const preview = await makePreviewClip(audioFile, startSeconds, PREVIEW_SECONDS);
+      setUploadStep(freeListening ? "Preparing your track…" : "Making the preview…");
+      const preview = freeListening ? null : await makePreviewClip(audioFile, startSeconds, PREVIEW_SECONDS);
 
       setUploadStep(`Uploading ${formatBytes(audioFile.size)}…`);
       const audioExt = audioExtension(audioFile.name) || "mp3";
@@ -180,14 +194,14 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
         preview_clip_url: previewUrl,
         duration_seconds: preview?.durationSeconds,
         cover_image_url: coverUrl,
-        price_cents: parsePriceCents(newPrice) ?? 0,
-        access_type: "purchase",
+        price_cents: freeListening ? 0 : parsePriceCents(newPrice) ?? 0,
+        access_type: freeListening ? "free" : hasSubscriptionRule && !newPrice.trim() ? "subscription" : "purchase",
         is_published: true,
-        allow_downloads: allowDownloads,
+        allow_downloads: !freeListening && allowDownloads,
         preview_start_seconds: startSeconds,
         preview_duration_seconds: PREVIEW_SECONDS,
       });
-      if (!preview) {
+      if (!preview && !freeListening) {
         toast.info("Track is up. We couldn't make a preview from this file, so fans see it locked without a sample.");
       }
 
@@ -209,12 +223,12 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
   if (isLoading) return null;
 
   if (!isOwner) {
-    if (tracks.length === 0 || !payoutStatus || payoutStatus.payout_enabled) return null;
+    if (!hasMonetizedContent || !payoutStatus || payoutStatus.payout_enabled) return null;
     return (
       <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 flex items-start gap-2">
         <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
         <p className="text-xs text-muted-foreground">
-          This artist hasn't connected payouts yet, so purchases and subscriptions are temporarily unavailable. You can still preview locked tracks.
+          This artist hasn't connected payouts yet, so purchases and subscriptions are temporarily unavailable. Free tracks remain available to listen to, and paid tracks have previews.
         </p>
       </div>
     );
@@ -234,7 +248,7 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
           <div className="flex items-center gap-2 whitespace-nowrap">
             <Lock className="w-4 h-4 text-amber-500" />
             <h3 className="font-display text-base font-medium text-foreground">
-              Locked music
+              Uploaded music
             </h3>
             {tracks.length > 0 && (
               <span className="text-xs text-muted-foreground">({tracks.length})</span>
@@ -262,7 +276,7 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
         </div>
         {tracks.length > 0 && (
           <p className="mt-1 text-xs text-muted-foreground">
-            Locked tracks show as sealed records in your catalog. Use Arrange to put them in a section.
+            Free tracks play in full. Paid tracks stay sealed until unlocked. Use Arrange to put them in a section.
           </p>
         )}
 
@@ -311,10 +325,10 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
         {tracks.length === 0 && (
           <div className="text-center pt-4 pb-2 text-muted-foreground">
             <Music className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            <p className="text-sm text-foreground">Sell tracks fans unlock with one payment</p>
-            <p className="text-xs mt-1">Fans hear a 15-second preview. The full file stays private until they buy.</p>
+            <p className="text-sm text-foreground">Upload music from your files</p>
+            <p className="text-xs mt-1">Share a full track for free listening, or set a price for paid access.</p>
             <Button size="sm" className="mt-3 min-h-11" onClick={() => setShowUpload(true)}>
-              <Plus className="w-4 h-4 mr-1" /> Upload a locked track
+              <Plus className="w-4 h-4 mr-1" /> Upload a track
             </Button>
           </div>
         )}
@@ -326,7 +340,7 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="w-5 h-5 text-primary" />
-              Upload a locked track
+              Upload a track
             </DialogTitle>
           </DialogHeader>
 
@@ -414,6 +428,25 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
               />
             </div>
 
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Listening access</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant={freeListening ? "default" : "outline"} className="min-h-11" aria-pressed={freeListening}
+                  onClick={() => { setFreeListening(true); setUploadProblems((p) => p.filter((v) => v !== "price")); }}>
+                  Free listening
+                </Button>
+                <Button type="button" variant={freeListening ? "outline" : "default"} className="min-h-11" aria-pressed={!freeListening}
+                  onClick={() => setFreeListening(false)}>
+                  Paid access
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {freeListening ? "Listeners can play the full track in Ether. No payouts setup needed. Downloads are off."
+                  : "Fans hear a 15-second preview and pay to unlock the full track."}
+              </p>
+            </fieldset>
+
+            {!freeListening && <>
             <div className="space-y-2">
               <Label htmlFor="exclusive-price">Price (USD)</Label>
               <Input
@@ -429,7 +462,7 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
                 className="h-11"
               />
               <p className="text-[11px] text-muted-foreground">
-                Fans pay once to unlock the full track, on any device they sign in on. 100% of the price goes to you.
+                Set $0.50–$500 for paid access.{hasSubscriptionRule ? " Leave empty for subscribers only." : ""}
               </p>
             </div>
 
@@ -454,11 +487,12 @@ export const ExclusiveMusicSection = ({ userId, hideOwnerEmpty = false }: Exclus
               <div>
                 <Label className="text-sm">Allow downloads</Label>
                 <p className="text-[11px] text-muted-foreground">
-                  Buyers can download the original audio file.
+                  Only listeners with a completed track purchase can download the original file.
                 </p>
               </div>
               <Switch checked={allowDownloads} onCheckedChange={setAllowDownloads} />
             </div>
+            </>}
           </div>
 
           {uploadProblems.length > 0 && (

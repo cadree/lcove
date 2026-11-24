@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import type { Json, TablesUpdate } from "@/integrations/supabase/types";
-import { LOCKED_MUSIC_BUCKET, summarizeSales, type TrackSales } from "@/lib/lockedMusic";
+import { LOCKED_MUSIC_BUCKET, isFreeMusicTrack, summarizeSales, type TrackSales } from "@/lib/lockedMusic";
 
 function jsonRecord(value: Json | null): Record<string, Json | undefined> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -121,10 +121,12 @@ export const useExclusiveTracks = (artistUserId?: string) => {
     enabled: !!user?.id,
   });
 
-  const isSubscribedToArtist = !!artistUserId && subscriptions.some((s) => s.artist_user_id === artistUserId);
+  const isSubscribedToArtist = !!artistUserId && subscriptions.some((s) => s.artist_user_id === artistUserId && (!s.current_period_end || Date.parse(s.current_period_end) > Date.now()));
 
   const hasAccess = (trackId: string): boolean => {
     if (isOwner) return true;
+    const track = tracks.find((t) => t.id === trackId);
+    if (track && isFreeMusicTrack(track)) return true;
     if (purchases.some((p) => p.track_id === trackId)) return true;
     if (isSubscribedToArtist) return true;
     return false;

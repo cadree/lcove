@@ -240,7 +240,7 @@ export function groupCatalog(
   const looseReleases = loose.filter((i) => i.kind === "release").map((i) => i.key);
   const looseLocked = loose.filter((i) => i.kind === "track").map((i) => i.key);
   if (looseReleases.length) shown.push({ id: UNSORTED_RELEASES, title: more ? "More releases" : "Releases", cover: null, custom: false, keys: looseReleases });
-  if (looseLocked.length) shown.push({ id: UNSORTED_LOCKED, title: more ? "More locked music" : "Locked music", cover: null, custom: false, keys: looseLocked });
+  if (looseLocked.length) shown.push({ id: UNSORTED_LOCKED, title: more ? "More uploaded music" : "Uploaded music", cover: null, custom: false, keys: looseLocked });
   return shown;
 }
 

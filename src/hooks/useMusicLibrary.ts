@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { readFunctionError } from "@/lib/functionError";
 import type { ExclusiveTrack } from "./useExclusiveMusic";
 
 export interface MusicSave {
@@ -167,20 +168,24 @@ export const useMusicLibraryMutations = () => {
 };
 
 /** Helper: trigger a browser download for an audio URL. */
-export const downloadTrack = async (url: string, filename: string) => {
+export const downloadTrack = async (trackId: string) => {
   try {
-    const res = await fetch(url);
+    const { data, error } = await supabase.functions.invoke("download-music-track", { body: { track_id: trackId } });
+    if (error) throw new Error(await readFunctionError(error, data, "Download unavailable"));
+    if (!data?.url || !data?.filename) throw new Error("Download unavailable");
+    const res = await fetch(data.url);
+    if (!res.ok) throw new Error("Could not download the audio file");
     const blob = await res.blob();
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = blobUrl;
-    a.download = filename;
+    a.download = data.filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(blobUrl);
   } catch (e) {
     console.error("Download failed", e);
-    toast.error("Download failed");
+    toast.error(e instanceof Error ? e.message : "Download failed");
   }
 };

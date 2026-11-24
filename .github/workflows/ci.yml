@@ -40,6 +40,11 @@ jobs:
       - name: Music catalog database checks
         run: npm run test:music-db
 
+      - name: Free music permissions and payout handlers
+        run: |
+          node scripts/free-music-db.test.mjs
+          node scripts/music-functions.test.mjs
+
       - name: Music page prefs database checks
         run: npm run test:music-prefs-db
 
