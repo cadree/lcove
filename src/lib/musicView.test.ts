@@ -17,6 +17,7 @@ test("hosted rows show price, DJ license, members or preview, the way checkout p
   const free = { ...track, price_cents: 0 };
   assert.equal(trackBadge(free, [{ rule_type: "subscription", amount_cents: 500, track_id: null }], viewer).label, "Subscribers");
   assert.equal(trackBadge(free, [], viewer).label, "Preview");
+  assert.deepEqual(trackBadge({ ...free, access_type: "free" }, [{ rule_type: "subscription", amount_cents: 500 }], viewer), { label: "Free listening", tone: "free" });
   assert.equal(trackBadge(track, [], { ...viewer, hasAccess: true }).label, "Unlocked");
   assert.equal(trackBadge({ ...track, is_published: false }, [], { ...viewer, isOwner: true }).label, "Draft");
   assert.equal(releaseBadge("spotify").label, "Free on Spotify");

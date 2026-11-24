@@ -46,7 +46,7 @@ serve(async (req) => {
     // request is ignored, and a rule id must belong to this track's artist.
     const { data: track } = await supabaseAdmin
       .from("exclusive_tracks")
-      .select("id, title, artist_user_id, price_cents, is_published")
+      .select("id, title, artist_user_id, price_cents, is_published, access_type")
       .eq("id", track_id)
       .maybeSingle();
 

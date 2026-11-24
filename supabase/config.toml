@@ -250,3 +250,6 @@ verify_jwt = false
 # the user JWT for downloads and the ApplePass token for PassKit routes.
 [functions.ether-id-pass]
 verify_jwt = false
+
+[functions.download-music-track]
+verify_jwt = true

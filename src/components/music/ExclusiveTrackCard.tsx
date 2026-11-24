@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePrivateTrackUrl, type ExclusiveTrack, type ExclusiveAccessRule } from "@/hooks/useExclusiveMusic";
-import { fileExtension, type TrackSales } from "@/lib/lockedMusic";
+import { isFreeMusicTrack, type TrackSales } from "@/lib/lockedMusic";
 import {
   useMyPurchases,
   useMySaves,
@@ -18,6 +18,7 @@ import { RecordSleeve } from "./RecordSleeve";
 import { IosDigitalGoodsNotice } from "@/components/ios/IosDigitalGoodsNotice";
 import { digitalPurchasesEnabled } from "@/lib/platform";
 import { toast } from "sonner";
+import { canDownloadMusic } from "../../../supabase/functions/_shared/music-download.mjs";
 
 interface ExclusiveTrackCardProps {
   track: ExclusiveTrack;
@@ -50,8 +51,9 @@ export const ExclusiveTrackCard = ({
   const { data: saves = [] } = useMySaves();
   const { saveTrack, unsaveTrack, toggleAddToProfile } = useMusicLibraryMutations();
 
-  const trackRules = rules.filter(
-    (r) => r.track_id === track.id || r.track_id === null
+  const freeListening = isFreeMusicTrack(track);
+  const trackRules = freeListening ? [] : rules.filter(
+    (r) => r.is_active && (r.track_id === track.id || r.track_id === null)
   );
   const purchaseRule = trackRules.find((r) => r.rule_type === "purchase");
   const subscriptionRule = trackRules.find((r) => r.rule_type === "subscription");
@@ -60,7 +62,8 @@ export const ExclusiveTrackCard = ({
   const price = ruleAmount > 0 ? ruleAmount : track.price_cents ?? 0;
 
   const ownsTrack = purchases.some((p) => p.track_id === track.id);
-  const fullAccess = hasAccess || ownsTrack || isOwner;
+  const fullAccess = freeListening || hasAccess || ownsTrack || isOwner;
+  const canDownload = canDownloadMusic(track, purchases.find((p) => p.track_id === track.id), user?.id);
   const save = saves.find((s) => s.track_id === track.id);
   const isSaved = !!save;
   const isOnProfile = !!save?.added_to_profile;
@@ -80,6 +83,7 @@ export const ExclusiveTrackCard = ({
   const showPaidUnlock = !fullAccess && !isOwner && (isPaid || !!subscriptionRule);
   const statusBadge = (() => {
     if (isOwner) return { label: track.is_published ? "Published" : "Draft", variant: "outline" as const };
+    if (freeListening) return { label: "Free listening", variant: "secondary" as const };
     if (fullAccess) return { label: "Unlocked", variant: "secondary" as const };
     if (isPaid) return { label: iosApp ? "Exclusive" : `$${(price / 100).toFixed(2)}`, variant: iosApp ? "outline" as const : "default" as const };
     if (subscriptionRule) return { label: "Subscribers", variant: "outline" as const };
@@ -87,8 +91,7 @@ export const ExclusiveTrackCard = ({
   })();
 
   const handleDownload = () => {
-    if (!fullUrl) return;
-    downloadTrack(fullUrl, `${track.title}.${fileExtension(track.audio_file_path || track.audio_file_url || "")}`);
+    if (canDownload) void downloadTrack(track.id);
   };
 
   return (
@@ -122,7 +125,7 @@ export const ExclusiveTrackCard = ({
       <div className="pt-2.5 space-y-2.5 flex-1 flex flex-col">
         <div className="space-y-0.5">
           <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            {fullAccess && !isOwner ? "Unlocked" : "Exclusive"}
+            {freeListening ? "Free listening" : fullAccess && !isOwner ? "Unlocked" : "Exclusive"}
           </p>
           <p className="font-display font-medium text-foreground text-sm truncate">{track.title}</p>
           {track.description && (
@@ -159,7 +162,7 @@ export const ExclusiveTrackCard = ({
             {sales.refunded > 0 ? ` · ${sales.refunded} refunded` : ""}
           </p>
         )}
-        {isOwner && (!sales || (sales.sold === 0 && sales.refunded === 0)) && track.is_published && (
+        {isOwner && !freeListening && (!sales || (sales.sold === 0 && sales.refunded === 0)) && track.is_published && (
           <p className="text-[11px] text-muted-foreground" data-testid="track-sales">No sales yet</p>
         )}
 
@@ -220,7 +223,7 @@ export const ExclusiveTrackCard = ({
               >
                 <UserPlus className="w-3 h-3" />
               </Button>
-              {track.allow_downloads && fullUrl && (
+              {canDownload && (
                 <Button
                   size="sm"
                   variant="outline"

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isAudioUpload } from "./audioFiles.ts";
-import { fileExtension, lockedUploadProblems, MAX_LOCKED_AUDIO_BYTES, parsePriceCents, summarizeSales } from "./lockedMusic.ts";
+import { fileExtension, isFreeMusicTrack, lockedUploadProblems, MAX_LOCKED_AUDIO_BYTES, parsePriceCents, summarizeSales } from "./lockedMusic.ts";
 
 const mp3 = { name: "song.mp3", type: "audio/mpeg", size: 8 * 1024 * 1024 };
 const base = { title: "New song", audio: mp3, cover: null, price: "4.99", isAudio: isAudioUpload };
@@ -36,6 +36,14 @@ describe("lockedUploadProblems", () => {
   it("lets subscriber-only tracks skip the price", () => {
     assert.deepEqual(lockedUploadProblems({ ...base, price: "", hasSubscriptionRule: true }), []);
     assert.deepEqual(lockedUploadProblems({ ...base, price: "0.10", hasSubscriptionRule: true }), ["price"]);
+  });
+  it("lets free listening uploads skip payment without skipping file checks", () => {
+    assert.deepEqual(lockedUploadProblems({ ...base, price: "", freeListening: true }), []);
+    assert.deepEqual(lockedUploadProblems({ ...base, price: "0", freeListening: true }), []);
+    assert.deepEqual(lockedUploadProblems({ ...base, audio: null, price: "", freeListening: true }), ["audio_missing"]);
+    assert.equal(isFreeMusicTrack({ access_type: "free", price_cents: 0, is_published: true }), true);
+    assert.equal(isFreeMusicTrack({ access_type: "purchase", price_cents: 0, is_published: true }), false);
+    assert.equal(isFreeMusicTrack({ access_type: "free", price_cents: 0, is_published: false }), false);
   });
   it("checks cover art type and size", () => {
     assert.deepEqual(lockedUploadProblems({ ...base, cover: { name: "c.pdf", type: "application/pdf", size: 10 } }), ["cover_type"]);

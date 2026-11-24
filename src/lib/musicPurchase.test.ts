@@ -31,5 +31,6 @@ describe("resolveMusicPurchase", () => {
     assert.throws(() => run({ alreadyPaid: true }), (e: MusicPurchaseError) => e.status === 409);
     assert.throws(() => run({ track: { ...track, price_cents: 0 } }), /doesn't have a price/);
     assert.throws(() => run({ track: { ...track, price_cents: 25 } }), /doesn't have a price/);
+    assert.throws(() => run({ track: { ...track, access_type: "free", price_cents: 0 }, rule, requestedRuleId: rule.id }), /free to listen/);
   });
 });

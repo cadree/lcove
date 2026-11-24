@@ -33,6 +33,7 @@ export interface RuleLike {
 export interface TrackLike {
   id: string;
   price_cents: number;
+  access_type?: string;
   is_published: boolean;
 }
 
@@ -56,6 +57,7 @@ export function trackBadge(
   { isOwner, hasAccess, iosApp }: { isOwner: boolean; hasAccess: boolean; iosApp: boolean },
 ): RowBadge {
   if (isOwner && !track.is_published) return { label: "Draft", tone: "draft" };
+  if (track.access_type === "free" && track.price_cents === 0 && track.is_published) return { label: "Free listening", tone: "free" };
   if (hasAccess && !isOwner) return { label: "Unlocked", tone: "unlocked" };
   const mine = rulesFor(track.id, rules);
   const license = mine.find((r) => isDjLicense(r) && r.track_id === track.id);
